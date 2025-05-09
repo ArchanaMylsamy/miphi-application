@@ -186,7 +186,7 @@ const Login = () => {
         email: credentials.email.toLowerCase(),
       };
       
-      const response = await fetch('https://miphi-application.vercel.app/login', {
+      const response = await fetch('https://miphi-blog-backend.vercel.app/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentialsToSend),

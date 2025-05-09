@@ -78,8 +78,8 @@ export default function ProductRegistrationsCRM() {
             return;
         }
         const url = isAdmin
-            ? `https://miphi-application.vercel.app/registered_users/` // ADMIN: Endpoint for all registrations
-            : `https://miphi-application.vercel.app/user_registrations/${userEmail}`; // USER: Endpoint for specific user's registrations
+            ? `https://miphi-blog-backend.vercel.app/registered_users/` // ADMIN: Endpoint for all registrations
+            : `https://miphi-blog-backend.vercel.app/user_registrations/${userEmail}`; // USER: Endpoint for specific user's registrations
 
         const response = await fetch(url,{
             method: 'GET',
@@ -97,7 +97,7 @@ export default function ProductRegistrationsCRM() {
         
 
         // This line is from your snippet.
-        // Please double-check: if your admin endpoint https://miphi-application.vercel.app/registered_users/
+        // Please double-check: if your admin endpoint https://miphi-blog-backend.vercel.app/registered_users/
         // returns {"registrations": [...]}, then for isAdmin true, it should be data.registrations
         const fetchedData = isAdmin ? data.registrations : data.registrations;
         
@@ -122,7 +122,7 @@ export default function ProductRegistrationsCRM() {
                               return { ...reg, warrantyStatus: "N/A (No Token)", hasWarrantyRecord: null };
                             }
                             const warrantyResponse = await fetch(
-                                `https://miphi-application.vercel.app/get_warranty/${reg.serial_number}`,
+                                `https://miphi-blog-backend.vercel.app/get_warranty/${reg.serial_number}`,
                                 {
                                     method: 'GET',
                                     headers: {
@@ -185,7 +185,7 @@ export default function ProductRegistrationsCRM() {
         setError("No token found. Please log in again.");
         return;
       }
-      const response = await fetch(`https://miphi-application.vercel.app/registered_warranty_claims/`, {
+      const response = await fetch(`https://miphi-blog-backend.vercel.app/registered_warranty_claims/`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -214,7 +214,7 @@ export default function ProductRegistrationsCRM() {
         setError("No token found. Please log in again.");
         return;
       }
-      const response = await fetch(`https://miphi-application.vercel.app/shipped_products/`, {
+      const response = await fetch(`https://miphi-blog-backend.vercel.app/shipped_products/`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -299,7 +299,7 @@ export default function ProductRegistrationsCRM() {
         setError("No token found. Please log in again.");
         return;
       }
-      const apiUrl = `https://miphi-application.vercel.app/download/invoice/${serialNumber}`;
+      const apiUrl = `https://miphi-blog-backend.vercel.app/download/invoice/${serialNumber}`;
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
@@ -628,7 +628,7 @@ export default function ProductRegistrationsCRM() {
           setError("No token found. Please log in again.");
           return;
         }
-        const response = await fetch('https://miphi-application.vercel.app/warranty', {
+        const response = await fetch('https://miphi-blog-backend.vercel.app/warranty', {
           method: 'POST', 
           headers: {
             'Content-Type': 'application/json',
@@ -729,7 +729,7 @@ export default function ProductRegistrationsCRM() {
           setError("No token found. Please log in again.");
           return;
         }
-        const response = await fetch('https://miphi-application.vercel.app/update_password', {
+        const response = await fetch('https://miphi-blog-backend.vercel.app/update_password', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -914,7 +914,7 @@ try {
         return;     
     }
     // Updated to match your backend API
-    const response = await fetch(`https://miphi-application.vercel.app/warranty_status`, {
+    const response = await fetch(`https://miphi-blog-backend.vercel.app/warranty_status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -955,7 +955,7 @@ try {
     }
     // Process each selected report individually since your backend doesn't support batch updates
     const updatePromises = selectedReportIds.map(serialNumber => 
-        fetch(`https://miphi-application.vercel.app/warranty_status`, {
+        fetch(`https://miphi-blog-backend.vercel.app/warranty_status`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1157,7 +1157,7 @@ const ManageProductsView = () => {
               return;       
           }
           // ADMIN: API call to add a new product
-          const response = await fetch(`https://miphi-application.vercel.app/products`, {
+          const response = await fetch(`https://miphi-blog-backend.vercel.app/products`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -1199,7 +1199,7 @@ const ManageProductsView = () => {
                       return; 
                   }
                   // Updated to use serial number for deletion
-                  const response = await fetch(`https://miphi-application.vercel.app/products/${serialNumber}`, {
+                  const response = await fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
                       method: 'DELETE',
                       headers: {
                         'Content-Type': 'application/json',
@@ -1254,7 +1254,7 @@ const ManageProductsView = () => {
                   }
                   // Process each selected product individually
                   const deletePromises = selectedProductIds.map(serialNumber => 
-                      fetch(`https://miphi-application.vercel.app/products/${serialNumber}`, {
+                      fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
                           method: 'DELETE',
                           headers: {
                             'Content-Type': 'application/json',
