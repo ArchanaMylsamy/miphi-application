@@ -200,7 +200,7 @@ const Login = () => {
 
         if (data.user && typeof data.user === 'object') {
           // API returned a user object. Assume it contains email, name, mobile_number.
-          userToStoreInContext = { ...data.user }; // Create a new object to avoid direct mutation if needed
+          userToStoreInContext = { ...data.user_details }; // Create a new object to avoid direct mutation if needed
 
           // Ensure email from API or credentials is lowercased for consistency
           if (userToStoreInContext.email && typeof userToStoreInContext.email === 'string') {
