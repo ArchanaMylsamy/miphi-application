@@ -1,12 +1,13 @@
-import { useState, useEffect, useContext, useCallback } from "react";
+import { useState, useEffect, useContext, useCallback ,useRef} from "react";
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, FileText, Download, Calendar, Package, Tag, User, Mail, Phone,
+  Search, FileText, Download, Calendar, Package, Tag, User, Mail, Phone,FileUp ,Loader,UploadCloud,
   Settings, LogOut, ChevronDown, Bell, Menu, X, ShieldCheck, Key, Info,
   AlertTriangle, ListChecks, PlusCircle, Edit3, Trash2, CheckSquare, Send // Added icons for admin
 } from "lucide-react";
 import { UserContext } from "../../context/UserContext";
 import Swal from 'sweetalert2';
+import Papa from 'papaparse';
 
 export default function ProductRegistrationsCRM() {
   const { user, setUser } = useContext(UserContext);
@@ -1135,310 +1136,598 @@ try {
 };
 // --- ADMIN: Manage Products View Component (Placeholder) ---
 const ManageProductsView = () => {
-  const [productForm, setProductForm] = useState({ product_name: '', serial_number : '' });
+  const [productForm, setProductForm] = useState({ product_name: '', serial_number: '' });
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [productSearchTerm, setProductSearchTerm] = useState('');
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [csvFile, setCsvFile] = useState(null);
+  const [isProcessingCsv, setIsProcessingCsv] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [activeTab, setActiveTab] = useState('single'); // 'single' or 'bulk'
+  const fileInputRef = useRef(null);
 
   const handleProductFormChange = (e) => {
-      const { name, value } = e.target;
-      setProductForm(prev => ({ ...prev, [name]: value }));
+    const { name, value } = e.target;
+    setProductForm(prev => ({ ...prev, [name]: value }));
   };
 
   const handleAddProduct = async (e) => {
-      e.preventDefault();
-      setIsAddingProduct(true);
-      Swal.fire({ title: 'Adding Product...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-      try {
-          const token = sessionStorage.getItem('token');
-          if(!token) {
-              setError("No token found. Please log in again.");
-              return;       
-          }
-          // ADMIN: API call to add a new product
-          const response = await fetch(`https://miphi-blog-backend.vercel.app/products`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-              },
-              body: JSON.stringify(productForm),
-          });
-          if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.error || `Failed to add product.`);
-          }
-          Swal.fire('Success', 'Product added successfully!', 'success');
-          fetchAllProducts(); // Refresh the list
-          setProductForm({ product_name: '', serial_number: '' }); // Reset form
-      } catch (error) {
-          console.error("Error adding product:", error);
-          Swal.fire('Error', `Failed to add product: ${error.message}`, 'error');
-      } finally {
-          setIsAddingProduct(false);
+    e.preventDefault();
+    setIsAddingProduct(true);
+    Swal.fire({ title: 'Adding Product...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    try {
+      const token = sessionStorage.getItem('token');
+      if (!token) {
+        setError("No token found. Please log in again.");
+        return;
       }
+      // ADMIN: API call to add a new product
+      const response = await fetch(`https://miphi-blog-backend.vercel.app/products`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(productForm),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to add product.`);
+      }
+      Swal.fire('Success', 'Product added successfully!', 'success');
+      fetchAllProducts(); // Refresh the list
+      setProductForm({ product_name: '', serial_number: '' }); // Reset form
+    } catch (error) {
+      console.error("Error adding product:", error);
+      Swal.fire('Error', `Failed to add product: ${error.message}`, 'error');
+    } finally {
+      setIsAddingProduct(false);
+    }
+  };
+
+  const handleCsvFileChange = (e) => {
+    if (e.target.files.length > 0) {
+      setCsvFile(e.target.files[0]);
+    }
+  };
+
+  const resetFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setCsvFile(null);
+    setUploadProgress(0);
+  };
+
+  const handleCsvUpload = async (e) => {
+    e.preventDefault();
+    if (!csvFile) {
+      Swal.fire('Warning', 'Please select a CSV file to upload.', 'warning');
+      return;
+    }
+
+    setIsProcessingCsv(true);
+    Swal.fire({
+      title: 'Processing CSV...',
+      html: 'Preparing to upload products...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    try {
+      const token = sessionStorage.getItem('token');
+      if (!token) {
+        setError("No token found. Please log in again.");
+        return;
+      }
+
+      // Parse CSV
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const csvText = event.target.result;
+        
+        // Use PapaParse to parse CSV
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: async (results) => {
+            const { data, errors } = results;
+            
+            if (errors.length > 0) {
+              Swal.fire('Error', 'CSV parsing error. Please check your CSV format.', 'error');
+              setIsProcessingCsv(false);
+              return;
+            }
+
+            if (data.length === 0) {
+              Swal.fire('Warning', 'No products found in the CSV file.', 'warning');
+              setIsProcessingCsv(false);
+              return;
+            }
+
+            // Validate required fields
+            for (let i = 0; i < data.length; i++) {
+              if (!data[i].product_name || !data[i].serial_number) {
+                Swal.fire('Error', `Row ${i + 1}: Missing product_name or serial_number.`, 'error');
+                setIsProcessingCsv(false);
+                return;
+              }
+            }
+
+            // Process each product
+            let successCount = 0;
+            let failureCount = 0;
+            const errorMessages = [];
+
+            // Update Swal with progress bar
+            Swal.update({
+              title: 'Uploading Products',
+              html: `
+                <div class="progress-bar-container" style="width: 100%; background-color: #f3f4f6; border-radius: 8px; overflow: hidden;">
+                  <div id="progress-bar" style="height: 20px; width: 0%; background-color: #4f46e5; transition: width 0.3s;"></div>
+                </div>
+                <p style="margin-top: 10px;" id="progress-text">Uploaded 0/${data.length} products...</p>
+              `,
+              showConfirmButton: false,
+              allowOutsideClick: false
+            });
+
+            for (let i = 0; i < data.length; i++) {
+              try {
+                const product = data[i];
+                
+                // Update progress
+                const progress = Math.round(((i+1) / data.length) * 100);
+                setUploadProgress(progress);
+                
+                // Update Swal progress bar
+                document.getElementById('progress-bar').style.width = `${progress}%`;
+                document.getElementById('progress-text').innerText = `Uploaded ${i+1}/${data.length} products...`;
+
+                const response = await fetch(`https://miphi-blog-backend.vercel.app/products`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    product_name: product.product_name,
+                    serial_number: product.serial_number
+                  }),
+                });
+
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  throw new Error(errorData.error || `Failed to add product: ${product.serial_number}`);
+                }
+                
+                successCount++;
+              } catch (error) {
+                failureCount++;
+                errorMessages.push(`Row ${i + 1}: ${error.message}`);
+                console.error("Error adding product:", error);
+              }
+            }
+
+            // Show results
+            fetchAllProducts(); // Refresh the product list
+            resetFileInput(); // Reset the file input
+
+            if (failureCount > 0) {
+              Swal.fire({
+                title: 'Upload Completed with Errors',
+                html: `
+                  <p>Successfully added ${successCount} products.</p>
+                  <p>Failed to add ${failureCount} products.</p>
+                  <div class="mt-4 text-left max-h-60 overflow-auto">
+                    <p class="font-bold">Errors:</p>
+                    <ul class="list-disc pl-5 text-sm">
+                      ${errorMessages.slice(0, 10).map(msg => `<li>${msg}</li>`).join('')}
+                      ${errorMessages.length > 10 ? `<li>...and ${errorMessages.length - 10} more errors</li>` : ''}
+                    </ul>
+                  </div>
+                `,
+                icon: 'warning'
+              });
+            } else {
+              Swal.fire('Success', `Successfully added all ${successCount} products from the CSV!`, 'success');
+            }
+          },
+          error: (error) => {
+            console.error("CSV parsing error:", error);
+            Swal.fire('Error', `Failed to parse CSV: ${error.message}`, 'error');
+          }
+        });
+      };
+
+      reader.readAsText(csvFile);
+    } catch (error) {
+      console.error("Error processing CSV:", error);
+      Swal.fire('Error', `Failed to process CSV: ${error.message}`, 'error');
+    } finally {
+      setIsProcessingCsv(false);
+    }
   };
 
   const handleDeleteProduct = async (serialNumber) => {
-      Swal.fire({
-          title: 'Are you sure?', 
-          text: "You won't be able to revert this!", 
-          icon: 'warning',
-          showCancelButton: true, 
-          confirmButtonColor: '#d33', 
-          cancelButtonColor: '#3085d6', 
-          confirmButtonText: 'Yes, delete it!'
-      }).then(async (result) => {
-          if (result.isConfirmed) {
-              setIsSubmitting(true);
-              try {
-                  const token = sessionStorage.getItem('token');
-                  if(!token) {
-                      setError("No token found. Please log in again.");
-                      return; 
-                  }
-                  // Updated to use serial number for deletion
-                  const response = await fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
-                      method: 'DELETE',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                      }
-                  });
-                  if (!response.ok) {
-                      const errorData = await response.json();
-                      throw new Error(errorData.error || `Failed to delete product.`);
-                  }
-                  Swal.fire('Deleted!', 'Product has been deleted.', 'success');
-                  fetchAllProducts(); // Refresh list
-              } catch (error) {
-                  console.error("Error deleting product:", error);
-                  Swal.fire('Error', `Failed to delete product: ${error.message}`, 'error');
-              } finally {
-                  setIsSubmitting(false);
-              }
+    Swal.fire({
+      title: 'Are you sure?',
+      text: "You won't be able to revert this!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        setIsSubmitting(true);
+        try {
+          const token = sessionStorage.getItem('token');
+          if (!token) {
+            setError("No token found. Please log in again.");
+            return;
           }
-      });
+          // Updated to use serial number for deletion
+          const response = await fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            }
+          });
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to delete product.`);
+          }
+          Swal.fire('Deleted!', 'Product has been deleted.', 'success');
+          fetchAllProducts(); // Refresh list
+        } catch (error) {
+          console.error("Error deleting product:", error);
+          Swal.fire('Error', `Failed to delete product: ${error.message}`, 'error');
+        } finally {
+          setIsSubmitting(false);
+        }
+      }
+    });
   };
 
   // New function for group deletion
   const handleGroupDelete = async () => {
-      if (selectedProductIds.length === 0) {
-          Swal.fire('Warning', 'Please select products to delete.', 'warning');
-          return;
-      }
+    if (selectedProductIds.length === 0) {
+      Swal.fire('Warning', 'Please select products to delete.', 'warning');
+      return;
+    }
 
-      Swal.fire({
-          title: 'Delete Multiple Products?',
-          text: `You are about to delete ${selectedProductIds.length} products. This cannot be undone!`,
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonColor: '#d33',
-          cancelButtonColor: '#3085d6',
-          confirmButtonText: 'Yes, delete them!'
-      }).then(async (result) => {
-          if (result.isConfirmed) {
-              setIsSubmitting(true);
-              Swal.fire({ 
-                  title: 'Deleting Products...', 
-                  allowOutsideClick: false, 
-                  didOpen: () => Swal.showLoading() 
-              });
+    Swal.fire({
+      title: 'Delete Multiple Products?',
+      text: `You are about to delete ${selectedProductIds.length} products. This cannot be undone!`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete them!'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        setIsSubmitting(true);
+        Swal.fire({
+          title: 'Deleting Products...',
+          allowOutsideClick: false,
+          didOpen: () => Swal.showLoading()
+        });
 
-              try {
-                  const token = sessionStorage.getItem('token');
-                  if(!token) {
-                      setError("No token found. Please log in again.");
-                      return;
-                  }
-                  // Process each selected product individually
-                  const deletePromises = selectedProductIds.map(serialNumber => 
-                      fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
-                          method: 'DELETE',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`,
-                          }
-                      })
-                  );
-                  
-                  const results = await Promise.allSettled(deletePromises);
-                  const failures = results.filter(r => r.status === 'rejected').length;
-                  
-                  if (failures > 0) {
-                      Swal.fire(
-                          'Partial Success', 
-                          `Deleted ${results.length - failures} out of ${results.length} products. ${failures} deletions failed.`, 
-                          'warning'
-                      );
-                  } else {
-                      Swal.fire('Success', 'All selected products were deleted!', 'success');
-                  }
-                  
-                  fetchAllProducts(); // Refresh the list
-                  setSelectedProductIds([]); // Clear selection
-              } catch (error) {
-                  console.error("Error in group deletion:", error);
-                  Swal.fire('Error', `Group deletion failed: ${error.message}`, 'error');
-              } finally {
-                  setIsSubmitting(false);
-              }
+        try {
+          const token = sessionStorage.getItem('token');
+          if (!token) {
+            setError("No token found. Please log in again.");
+            return;
           }
-      });
+          // Process each selected product individually
+          const deletePromises = selectedProductIds.map(serialNumber =>
+            fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              }
+            })
+          );
+
+          const results = await Promise.allSettled(deletePromises);
+          const failures = results.filter(r => r.status === 'rejected').length;
+
+          if (failures > 0) {
+            Swal.fire(
+              'Partial Success',
+              `Deleted ${results.length - failures} out of ${results.length} products. ${failures} deletions failed.`,
+              'warning'
+            );
+          } else {
+            Swal.fire('Success', 'All selected products were deleted!', 'success');
+          }
+
+          fetchAllProducts(); // Refresh the list
+          setSelectedProductIds([]); // Clear selection
+        } catch (error) {
+          console.error("Error in group deletion:", error);
+          Swal.fire('Error', `Group deletion failed: ${error.message}`, 'error');
+        } finally {
+          setIsSubmitting(false);
+        }
+      }
+    });
   };
 
   // Toggle product selection for group actions
   const toggleSelectProduct = (serialNumber) => {
-      setSelectedProductIds(prev => 
-          prev.includes(serialNumber) ? prev.filter(sn => sn !== serialNumber) : [...prev, serialNumber]
-      );
+    setSelectedProductIds(prev =>
+      prev.includes(serialNumber) ? prev.filter(sn => sn !== serialNumber) : [...prev, serialNumber]
+    );
   };
 
   // Filter products by serial number
-  const filteredSystemProducts = productSearchTerm 
-      ? allProducts.filter(product => 
-          product.serial_number.toLowerCase().includes(productSearchTerm.toLowerCase())
-        )
-      : allProducts;
+  const filteredSystemProducts = productSearchTerm
+    ? allProducts.filter(product =>
+      product.serial_number.toLowerCase().includes(productSearchTerm.toLowerCase())
+    )
+    : allProducts;
 
-  console.log(allProducts);
-  
+  // Download sample CSV template
+  const downloadSampleCsv = () => {
+    const csvContent = "product_name,serial_number\nProduct 1,SN001\nProduct 2,SN002\nProduct 3,SN003";
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('hidden', '');
+    a.setAttribute('href', url);
+    a.setAttribute('download', 'product_template.csv');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
-      <div className="space-y-8">
-          {/* Add New Product Form */}
-          <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
-              <h2 className="text-2xl font-semibold mb-1 text-slate-800 flex items-center">
-                  <PlusCircle className="mr-3 text-indigo-600" size={28}/> Add New Product
-              </h2>
-              <p className="text-sm text-slate-500 mb-6">Define new products that can be registered by users.</p>
-              <form onSubmit={handleAddProduct} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                          <label htmlFor="product_name_manage" className="block text-sm font-medium text-slate-700 mb-1">Product Name</label>
-                          <input type="text" name="product_name" id="product_name_manage" value={productForm.product_name} onChange={handleProductFormChange} required className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"/>
-                      </div>
-                      <div>
-                          <label htmlFor="serial_number_manage" className="block text-sm font-medium text-slate-700 mb-1">Serial Number</label>
-                          <input type="text" name="serial_number" id="serial_number_manage" value={productForm.serial_number} onChange={handleProductFormChange} placeholder="e.g.,SN123" className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"/>
-                      </div>
-                  </div>
-                  
-                  <div>
-                      <button type="submit" disabled={isAddingProduct} className="w-full sm:w-auto flex justify-center items-center py-2.5 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60">
-                          {isAddingProduct ? 'Adding...' : 'Add Product'}
-                      </button>
-                  </div>
-              </form>
-          </div>
-
-          {/* View All Products Table */}
-          <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
-                        <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18}/>
-                        <input 
-                            type="text"
-                            placeholder="Search by serial number..."
-                            value={productSearchTerm}
-                            onChange={(e) => setProductSearchTerm(e.target.value)}
-                            className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                        </div>
-                        <p className="text-slate-600 text-sm whitespace-nowrap">
-                            Showing <span className="font-semibold text-indigo-600">{filteredSystemProducts.length}</span> of <span className="font-semibold text-indigo-600">{allProducts.length}</span> registrations
-                        </p>
-                    </div>
-               <h2 className="text-2xl font-semibold mb-1 text-slate-800 flex items-center">
-                  <Package className="mr-3 text-indigo-600" size={28}/> Existing Products
-              </h2>
-              <p className="text-sm text-slate-500 mb-6">View and manage all products available in the system.</p>
-               
-              <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div className="relative flex items-center w-full md:w-auto">
-                      
-                  </div>
-                  
-                  {/* Show group delete button when items are selected */}
-                  {selectedProductIds.length > 0 && (
-                      <button 
-                          onClick={handleGroupDelete}
-                          disabled={isSubmitting}
-                          className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center text-sm disabled:opacity-50"
-                      >
-                          <Trash2 size={16} className="mr-2"/> Delete Selected ({selectedProductIds.length})
-                      </button>
-                  )}
+    <div className="space-y-8">
+      {/* Add New Product Form */}
+      <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
+        <h2 className="text-2xl font-semibold mb-1 text-slate-800 flex items-center">
+          <PlusCircle className="mr-3 text-indigo-600" size={28} /> Add New Product
+        </h2>
+        <p className="text-sm text-slate-500 mb-6">Define new products that can be registered by users.</p>
+        
+        {/* Tabs for single vs bulk upload */}
+        <div className="mb-6 border-b border-slate-200">
+          <ul className="flex flex-wrap -mb-px text-sm font-medium text-center" role="tablist">
+            <li className="mr-2" role="presentation">
+              <button 
+                className={`inline-block p-4 border-b-2 rounded-t-lg ${activeTab === 'single' ? 'border-indigo-600 text-indigo-600' : 'border-transparent hover:text-indigo-600 hover:border-indigo-600'}`}
+                type="button" 
+                role="tab"
+                aria-selected={activeTab === 'single'}
+                onClick={() => setActiveTab('single')}
+              >
+                One Product Only
+              </button>
+            </li>
+            <li className="mr-2" role="presentation">
+              <button 
+                className={`inline-block p-4 border-b-2 rounded-t-lg ${activeTab === 'bulk' ? 'border-indigo-600 text-indigo-600' : 'border-transparent hover:text-indigo-600 hover:border-indigo-600'}`}
+                type="button" 
+                role="tab"
+                aria-selected={activeTab === 'bulk'}
+                onClick={() => setActiveTab('bulk')}
+              >
+                Add Multiple Products (CSV)
+              </button>
+            </li>
+          </ul>
+        </div>
+        
+        {/* Single Product Form */}
+        <div id="single-product" role="tabpanel" className={activeTab === 'single' ? '' : 'hidden'}>
+          <form onSubmit={handleAddProduct} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="product_name_manage" className="block text-sm font-medium text-slate-700 mb-1">Product Name</label>
+                <input type="text" name="product_name" id="product_name_manage" value={productForm.product_name} onChange={handleProductFormChange} required className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
               </div>
-
-              
-              
-              {filteredSystemProducts.length === 0 ? (
-                  <div className="text-center py-10 text-slate-500">
-                      {productSearchTerm ? `No products found for "${productSearchTerm}".` : "No products added to the system yet."}
-                  </div>
-              ) : (
-              <div className="overflow-x-auto">
-                  <table className="w-full min-w-[700px] divide-y divide-slate-200">
-                      <thead className="bg-slate-50">
-                          <tr>
-                              <th scope="col" className="px-2 py-3 text-center">
-                                  <input 
-                                      type="checkbox" 
-                                      className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
-                                      onChange={(e) => {
-                                          if (e.target.checked) {
-                                              setSelectedProductIds(filteredSystemProducts.map(p => p.serial_number));
-                                          } else {
-                                              setSelectedProductIds([]);
-                                          }
-                                      }}
-                                      checked={selectedProductIds.length > 0 && selectedProductIds.length === filteredSystemProducts.length}
-                                      title="Select all visible"
-                                  />
-                              </th>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Name</th>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered Status</th>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                          </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-slate-200">
-                          {filteredSystemProducts.map((product) => (
-                              <tr key={product.id || product.product_name} className={`${selectedProductIds.includes(product.serial_number) ? 'bg-indigo-50' : 'hover:bg-slate-50'} transition-colors`}>
-                                  <td className="px-2 py-4 text-center">
-                                      <input 
-                                          type="checkbox" 
-                                          className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
-                                          checked={selectedProductIds.includes(product.serial_number)}
-                                          onChange={() => toggleSelectProduct(product.serial_number)}
-                                      />
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{product.product_name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.serial_number}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.registered_status}</td>
-                                 
-                                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-2">
-                                      <button 
-                                          onClick={() => handleDeleteProduct(product.serial_number)} 
-                                          title="Delete Product" 
-                                          className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50" 
-                                          disabled={isSubmitting}
-                                      > 
-                                          <Trash2 size={18}/> 
-                                      </button>
-                                  </td>
-                              </tr>
-                          ))}
-                      </tbody>
-                  </table>
+              <div>
+                <label htmlFor="serial_number_manage" className="block text-sm font-medium text-slate-700 mb-1">Serial Number</label>
+                <input type="text" name="serial_number" id="serial_number_manage" value={productForm.serial_number} onChange={handleProductFormChange} placeholder="e.g.,SN123" className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
               </div>
+            </div>
+
+            <div>
+              <button type="submit" disabled={isAddingProduct} className="w-full sm:w-auto flex justify-center items-center py-2.5 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60">
+                {isAddingProduct ? 'Adding...' : 'Add Product'}
+              </button>
+            </div>
+          </form>
+        </div>
+        
+        {/* CSV Upload Form */}
+        <div id="csv-upload" role="tabpanel" className={activeTab === 'bulk' ? '' : 'hidden'}>
+          <form onSubmit={handleCsvUpload} className="space-y-4">
+            <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
+              <div className="flex flex-col items-center justify-center space-y-4">
+                <FileUp size={42} className="text-slate-400" />
+                <div className="space-y-1">
+                  <h3 className="text-lg font-medium text-slate-700">Upload CSV File</h3>
+                  <p className="text-sm text-slate-500">
+                    Upload a CSV file with columns: product_name, serial_number
+                  </p>
+                  <p className="text-xs text-indigo-600 hover:underline cursor-pointer" onClick={downloadSampleCsv}>
+                    Download sample template
+                  </p>
+                </div>
+                <input
+                  type="file"
+                  accept=".csv"
+                  ref={fileInputRef}
+                  onChange={handleCsvFileChange}
+                  className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                />
+              </div>
+              {csvFile && (
+                <div className="mt-4 p-3 bg-indigo-50 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center">
+                    <FileText className="text-indigo-600 mr-2" size={18} />
+                    <span className="text-sm font-medium text-slate-700 truncate max-w-xs">
+                      {csvFile.name}
+                    </span>
+                    <span className="text-xs text-slate-500 ml-2">
+                      ({(csvFile.size / 1024).toFixed(2)} KB)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resetFileInput}
+                    className="text-slate-500 hover:text-red-600"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               )}
-          </div>
+            </div>
+
+            {uploadProgress > 0 && (
+              <div className="w-full bg-slate-200 rounded-full h-2.5 mb-4">
+                <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-slate-500">
+                Make sure your CSV has the correct format with required fields.
+              </p>
+              <button
+                type="submit"
+                disabled={isProcessingCsv || !csvFile}
+                className="flex justify-center items-center py-2.5 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60"
+              >
+                {isProcessingCsv ? (
+                  <>
+                    <Loader className="animate-spin mr-2" size={16} />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud className="mr-2" size={16} />
+                    Upload & Process
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
+
+      {/* View All Products Table */}
+      <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
+          <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search by serial number..."
+              value={productSearchTerm}
+              onChange={(e) => setProductSearchTerm(e.target.value)}
+              className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <p className="text-slate-600 text-sm whitespace-nowrap">
+            Showing <span className="font-semibold text-indigo-600">{filteredSystemProducts.length}</span> of <span className="font-semibold text-indigo-600">{allProducts.length}</span> registrations
+          </p>
+        </div>
+        <h2 className="text-2xl font-semibold mb-1 text-slate-800 flex items-center">
+          <Package className="mr-3 text-indigo-600" size={28} /> Existing Products
+        </h2>
+        <p className="text-sm text-slate-500 mb-6">View and manage all products available in the system.</p>
+
+        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="relative flex items-center w-full md:w-auto">
+
+          </div>
+
+          {/* Show group delete button when items are selected */}
+          {selectedProductIds.length > 0 && (
+            <button
+              onClick={handleGroupDelete}
+              disabled={isSubmitting}
+              className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center text-sm disabled:opacity-50"
+            >
+              <Trash2 size={16} className="mr-2" /> Delete Selected ({selectedProductIds.length})
+            </button>
+          )}
+        </div>
+
+        {filteredSystemProducts.length === 0 ? (
+          <div className="text-center py-10 text-slate-500">
+            {productSearchTerm ? `No products found for "${productSearchTerm}".` : "No products added to the system yet."}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px] divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th scope="col" className="px-2 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedProductIds(filteredSystemProducts.map(p => p.serial_number));
+                        } else {
+                          setSelectedProductIds([]);
+                        }
+                      }}
+                      checked={selectedProductIds.length > 0 && selectedProductIds.length === filteredSystemProducts.length}
+                      title="Select all visible"
+                    />
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Name</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered Status</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-200">
+                {filteredSystemProducts.map((product) => (
+                  <tr key={product.id || product.product_name} className={`${selectedProductIds.includes(product.serial_number) ? 'bg-indigo-50' : 'hover:bg-slate-50'} transition-colors`}>
+                    <td className="px-2 py-4 text-center">
+                      <input
+                        type="checkbox"
+                        className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
+                        checked={selectedProductIds.includes(product.serial_number)}
+                        onChange={() => toggleSelectProduct(product.serial_number)}
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{product.product_name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.serial_number}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.registered_status}</td>
+
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-2">
+                      <button
+                        onClick={() => handleDeleteProduct(product.serial_number)}
+                        title="Delete Product"
+                        className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
+                        disabled={isSubmitting}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
-
   // --- Main Component Render ---
   return (
     <div className="flex min-h-screen bg-slate-100">
