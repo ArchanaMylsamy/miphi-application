@@ -1,8 +1,8 @@
-import { useState, useEffect, useContext, useCallback ,useRef} from "react";
+import { useState, useEffect, useContext, useCallback, useRef ,useMemo} from "react";
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, FileText, Download, Calendar, Package, Tag, User, Mail, Phone,FileUp ,Loader,UploadCloud,
-  Settings, LogOut, ChevronDown, Bell, Menu, X, ShieldCheck, Key, Info,
+  Search, FileText, Download, Calendar, Package, Tag, User, Mail, Phone, FileUp, Loader, UploadCloud,ChevronLeft,ChevronRight,
+  Settings, LogOut, ChevronDown, Bell, Menu, X, ShieldCheck, Key, Info, BookOpenCheck, BookText,
   AlertTriangle, ListChecks, PlusCircle, Edit3, Trash2, CheckSquare, Send // Added icons for admin
 } from "lucide-react";
 import { UserContext } from "../../context/UserContext";
@@ -17,6 +17,7 @@ export default function ProductRegistrationsCRM() {
   // --- Common State ---
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [message, setMessage] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -62,127 +63,127 @@ export default function ProductRegistrationsCRM() {
     // For this example, assuming they are passed in or stable from closure.
 
     if (!isAdmin && !userEmail) {
-        setRegistrations([]);
-        // setLoading(false); // Might be handled by a broader loading strategy
-        // setError("User email not available for fetching registrations.");
-        return;
+      setRegistrations([]);
+      // setLoading(false); // Might be handled by a broader loading strategy
+      // setError("User email not available for fetching registrations.");
+      return;
     }
     // Only fetch if admin is on allRegistrations page or user is on their registrations page
     if (isAdmin && currentPage !== 'allRegistrations') return;
     if (!isAdmin && currentPage !== 'registrations') return;
 
     try {
-        setLoading(true);
-        const token = sessionStorage.getItem('token');
-        if(!token) {
-            setError("No token found. Please log in again.");
-            return;
-        }
-        const url = isAdmin
-            ? `https://miphi-blog-backend.vercel.app/registered_users/` // ADMIN: Endpoint for all registrations
-            : `https://miphi-blog-backend.vercel.app/user_registrations/${userEmail}`; // USER: Endpoint for specific user's registrations
+      setLoading(true);
+      const token = sessionStorage.getItem('token');
+      if (!token) {
+        setError("No token found. Please log in again.");
+        return;
+      }
+      const url = isAdmin
+        ? `https://miphi-blog-backend.vercel.app/registered_users/` // ADMIN: Endpoint for all registrations
+        : `https://miphi-blog-backend.vercel.app/user_registrations/${userEmail}`; // USER: Endpoint for specific user's registrations
 
-        const response = await fetch(url,{
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-          },
-        });
-        if (!response.ok) {
-            throw new Error(
-                `API error (registrations): ${response.status} ${response.statusText}`
-            );
-        }
-        const data = await response.json();
-        
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(
+          `API error (registrations): ${response.status} ${response.statusText}`
+        );
+      }
+      const data = await response.json();
 
-        // This line is from your snippet.
-        // Please double-check: if your admin endpoint https://miphi-blog-backend.vercel.app/registered_users/
-        // returns {"registrations": [...]}, then for isAdmin true, it should be data.registrations
-        const fetchedData = isAdmin ? data.registrations : data.registrations;
-        
-        const fetchedItems = fetchedData || [];
 
-        if (fetchedItems.length > 0) {
-            if (isAdmin) {
-                // ADMIN PATH: No warranty check, use the fetched data directly.
-                console.log("Fetched all registrations for admin:", fetchedItems);
-                setAllRegistrations(fetchedItems);
-            } else {
-                // USER PATH: Perform warranty check for each registration.
-                const itemsWithWarranty = await Promise.all(
-                    fetchedItems.map(async (reg) => {
-                        try {
-                            if (!reg.serial_number) {
-                                return { ...reg, warrantyStatus: "N/A (No S/N)", hasWarrantyRecord: null };
-                            }
-                            const token = sessionStorage.getItem('token');
-                            if(!token) {
-                              setError("No token found. Please log in again.");
-                              return { ...reg, warrantyStatus: "N/A (No Token)", hasWarrantyRecord: null };
-                            }
-                            const warrantyResponse = await fetch(
-                                `https://miphi-blog-backend.vercel.app/get_warranty/${reg.serial_number}`,
-                                {
-                                    method: 'GET',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': `Bearer ${token}`,
-                                    }, 
-                                }
-                            );
-                            if (warrantyResponse.ok) {
-                                const warrantyData = await warrantyResponse.json();
-                                // Added a check for warrantyData itself for robustness
-                                if (warrantyData && warrantyData.length > 0) {
-                                    const statusMessage = warrantyData[0]?.claim_status;
-                                    return { ...reg, warrantyStatus: statusMessage, warrantyRecord: warrantyData[0], hasWarrantyRecord: true };
-                                } else {
-                                    return { ...reg, warrantyStatus: "Not Claimed", hasWarrantyRecord: false };
-                                }
-                            } else if (warrantyResponse.status === 404) {
-                                return { ...reg, warrantyStatus: "Not Claimed", hasWarrantyRecord: false };
-                            } else {
-                                console.warn(`Error fetching warranty for S/N ${reg.serial_number}: ${warrantyResponse.status} ${warrantyResponse.statusText}`);
-                                return { ...reg, warrantyStatus: "Status Unavailable", hasWarrantyRecord: null };
-                            }
-                        } catch (warrantyErr) {
-                            console.error(`Exception fetching warranty for S/N ${reg.serial_number}:`, warrantyErr);
-                            return { ...reg, warrantyStatus: "Error Fetching Status", hasWarrantyRecord: null };
-                        }
-                    })
-                );
-                setRegistrations(itemsWithWarranty);
-            }
-        } else {
-            // No items fetched
-            if (isAdmin) {
-                setAllRegistrations([]);
-            } else {
-                setRegistrations([]);
-            }
-        }
-        setError(null);
-    } catch (err) {
-        console.error("Error fetching registration data:", err);
-        setError(err.message);
+      // This line is from your snippet.
+      // Please double-check: if your admin endpoint https://miphi-blog-backend.vercel.app/registered_users/
+      // returns {"registrations": [...]}, then for isAdmin true, it should be data.registrations
+      const fetchedData = isAdmin ? data.registrations : data.registrations;
+
+      const fetchedItems = fetchedData || [];
+
+      if (fetchedItems.length > 0) {
         if (isAdmin) {
-            setAllRegistrations([]);
+          // ADMIN PATH: No warranty check, use the fetched data directly.
+          console.log("Fetched all registrations for admin:", fetchedItems);
+          setAllRegistrations(fetchedItems);
         } else {
-            setRegistrations([]);
+          // USER PATH: Perform warranty check for each registration.
+          const itemsWithWarranty = await Promise.all(
+            fetchedItems.map(async (reg) => {
+              try {
+                if (!reg.serial_number) {
+                  return { ...reg, warrantyStatus: "N/A (No S/N)", hasWarrantyRecord: null };
+                }
+                const token = sessionStorage.getItem('token');
+                if (!token) {
+                  setError("No token found. Please log in again.");
+                  return { ...reg, warrantyStatus: "N/A (No Token)", hasWarrantyRecord: null };
+                }
+                const warrantyResponse = await fetch(
+                  `https://miphi-blog-backend.vercel.app/get_warranty/${reg.serial_number}`,
+                  {
+                    method: 'GET',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`,
+                    },
+                  }
+                );
+                if (warrantyResponse.ok) {
+                  const warrantyData = await warrantyResponse.json();
+                  // Added a check for warrantyData itself for robustness
+                  if (warrantyData && warrantyData.length > 0) {
+                    const statusMessage = warrantyData[0]?.claim_status;
+                    return { ...reg, warrantyStatus: statusMessage, warrantyRecord: warrantyData[0], hasWarrantyRecord: true };
+                  } else {
+                    return { ...reg, warrantyStatus: "Not Claimed", hasWarrantyRecord: false };
+                  }
+                } else if (warrantyResponse.status === 404) {
+                  return { ...reg, warrantyStatus: "Not Claimed", hasWarrantyRecord: false };
+                } else {
+                  console.warn(`Error fetching warranty for S/N ${reg.serial_number}: ${warrantyResponse.status} ${warrantyResponse.statusText}`);
+                  return { ...reg, warrantyStatus: "Status Unavailable", hasWarrantyRecord: null };
+                }
+              } catch (warrantyErr) {
+                console.error(`Exception fetching warranty for S/N ${reg.serial_number}:`, warrantyErr);
+                return { ...reg, warrantyStatus: "Error Fetching Status", hasWarrantyRecord: null };
+              }
+            })
+          );
+          setRegistrations(itemsWithWarranty);
         }
+      } else {
+        // No items fetched
+        if (isAdmin) {
+          setAllRegistrations([]);
+        } else {
+          setRegistrations([]);
+        }
+      }
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching registration data:", err);
+      setError(err.message);
+      if (isAdmin) {
+        setAllRegistrations([]);
+      } else {
+        setRegistrations([]);
+      }
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-}, [userEmail, isAdmin, currentPage /*, setRegistrations, setAllRegistrations, setLoading, setError (if not stable) */]);
+  }, [userEmail, isAdmin, currentPage /*, setRegistrations, setAllRegistrations, setLoading, setError (if not stable) */]);
 
   const fetchWarrantyReports = useCallback(async () => {
     if (!isAdmin || currentPage !== 'warrantyReports') return; // Only for admin on warrantyReports page
     setLoading(true);
     try {
       const token = sessionStorage.getItem('token');
-      if(!token) {
+      if (!token) {
         setError("No token found. Please log in again.");
         return;
       }
@@ -193,14 +194,21 @@ export default function ProductRegistrationsCRM() {
           'Authorization': `Bearer ${token}`,
         }
       });
+      if (response.status === 404) {
+        setWarrantyReports([]);
+        setMessage("No warranty claims yet."); // Display this message
+        return;
+      }
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       const data = await response.json();
       setWarrantyReports(data.registrations || []); // Adjust based on API response
       setError(null);
+      setMessage(null);
     } catch (err) {
       console.error("Error fetching warranty reports:", err);
       setError(err.message);
       setWarrantyReports([]);
+      setMessage(null);
     } finally {
       setLoading(false);
     }
@@ -211,7 +219,7 @@ export default function ProductRegistrationsCRM() {
     setLoading(true);
     try {
       const token = sessionStorage.getItem('token');
-      if(!token) {
+      if (!token) {
         setError("No token found. Please log in again.");
         return;
       }
@@ -238,16 +246,16 @@ export default function ProductRegistrationsCRM() {
 
   useEffect(() => {
     if (isAdmin) {
-        if (currentPage === 'allRegistrations') fetchRegistrations();
-        else if (currentPage === 'warrantyReports') fetchWarrantyReports();
-        else if (currentPage === 'manageProducts') fetchAllProducts();
+      if (currentPage === 'allRegistrations') fetchRegistrations();
+      else if (currentPage === 'warrantyReports') fetchWarrantyReports();
+      else if (currentPage === 'manageProducts') fetchAllProducts();
     } else { // Regular user
-        if (userEmail && currentPage === 'registrations') {
-            fetchRegistrations();
-        } else if (!userEmail && currentPage === 'registrations') {
-            setRegistrations([]);
-            setLoading(false);
-        }
+      if (userEmail && currentPage === 'registrations') {
+        fetchRegistrations();
+      } else if (!userEmail && currentPage === 'registrations') {
+        setRegistrations([]);
+        setLoading(false);
+      }
     }
   }, [userEmail, isAdmin, currentPage, fetchRegistrations, fetchWarrantyReports, fetchAllProducts]);
 
@@ -272,11 +280,11 @@ export default function ProductRegistrationsCRM() {
   const itemsToFilter = isAdmin ? allRegistrations : registrations;
   const filteredItems = Array.isArray(itemsToFilter)
     ? itemsToFilter.filter(
-        (reg) =>
-          reg.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          reg.serial_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (isAdmin && reg.user_email?.toLowerCase().includes(searchTerm.toLowerCase())) // Admin can search by user email
-      )
+      (reg) =>
+        reg.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        reg.serial_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (isAdmin && reg.user_email?.toLowerCase().includes(searchTerm.toLowerCase())) // Admin can search by user email
+    )
     : [];
 
   // --- Format Date Utility --- 
@@ -292,11 +300,11 @@ export default function ProductRegistrationsCRM() {
   };
 
   // --- Download Invoice Action --- ( 그대로 사용 )
-  const downloadInvoice = async (productName, serialNumber) => {
+  const downloadInvoice = async (id, productName, serialNumber) => {
     try {
       console.log(`Downloading invoice for: ${productName} (S/N: ${serialNumber})`);
       const token = sessionStorage.getItem('token');
-      if(!token) {
+      if (!token) {
         setError("No token found. Please log in again.");
         return;
       }
@@ -316,7 +324,7 @@ export default function ProductRegistrationsCRM() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${productName}-invoice.pdf`;
+      link.download = `${id}_${serialNumber}.pdf`; // Adjust file name as needed
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -326,7 +334,7 @@ export default function ProductRegistrationsCRM() {
       Swal.fire('Error', `Error downloading invoice: ${error.message}`, 'error');
     }
   };
-  
+
   // --- Handle Warranty Claim Click (for user) ---
   const handleClaimClick = (registration) => {
     setSelectedRegistrationForClaim(registration);
@@ -341,7 +349,7 @@ export default function ProductRegistrationsCRM() {
       setSelectedRegistrationForClaim(null);
     }
     if (isAdmin && page !== 'warrantyReportsEdit') { // Example for admin if an edit sub-page exists
-        setEditingWarranty(null);
+      setEditingWarranty(null);
     }
     // Reset search term when changing pages
     setSearchTerm("");
@@ -358,15 +366,17 @@ export default function ProductRegistrationsCRM() {
       setIsSidebarOpen(!isSidebarOpen);
     }
   };
-  
+
   // --- User Info Card Component --- (can be used by user, or adapted for admin if needed)
   const UserInfoCard = ({ userInfoFromReg, userFromContext, userEmail }) => {
     const displayUser = userFromContext || {
+      id: userInfoFromReg?.user_id,
       name: userInfoFromReg?.user_name,
       email: userEmail, // Ensure this is correctly sourced
-      mobile_number: userInfoFromReg?.mobile_number // Corrected from mobile
+      mobile_number: userInfoFromReg?.mobile_number, // Corrected from mobile
+      country_code: userInfoFromReg?.country_code // Added country code
     };
-  
+
     return (
       <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-slate-200">
         <h2 className="text-2xl font-semibold mb-6 text-slate-800 flex items-center">
@@ -374,6 +384,15 @@ export default function ProductRegistrationsCRM() {
           Your Information
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex items-start p-4 bg-slate-50 rounded-lg">
+            <User className="mr-3 text-indigo-500 mt-1 flex-shrink-0" size={20} />
+            <div>
+              <p className="text-sm text-slate-500 font-medium">User ID</p>
+              <p className="font-semibold text-slate-700 text-lg">
+                {displayUser.id || 'N/A'}
+              </p>
+            </div>
+          </div>
           <div className="flex items-start p-4 bg-slate-50 rounded-lg">
             <User className="mr-3 text-indigo-500 mt-1 flex-shrink-0" size={20} />
             <div>
@@ -397,7 +416,7 @@ export default function ProductRegistrationsCRM() {
             <div>
               <p className="text-sm text-slate-500 font-medium">Phone</p>
               <p className="font-semibold text-slate-700 text-lg">
-                {displayUser.mobile_number || 'N/A'}
+                {displayUser.country_code || 'N/A'}-{displayUser.mobile_number || 'N/A'}
               </p>
             </div>
           </div>
@@ -408,12 +427,54 @@ export default function ProductRegistrationsCRM() {
 
   // --- Sidebar Component (Modified for Admin) ---
   const Sidebar = () => {
-    const commonItems = [ { icon: Settings, label: "Settings", page: "settings" }];
+    const commonItems = [{ icon: Settings, label: "Settings", page: "settings" }];
+
+    // Define action handlers for new PDF items directly within Sidebar or pass from parent
+    const handleDownloadInstallationGuide = useCallback(() => {
+      const pdfUrl = '/pdf/MIPHI_Installation_Guide.pdf'; // IMPORTANT: Replace with the ACTUAL PATH to your PDF in the public folder
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.setAttribute('download', 'MIPHI_Installation_Guide.pdf'); // Suggested filename for download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      // Optional: brief confirmation
+      Swal.fire({
+        title: 'Downloading...',
+        text: 'Installation Guide will be downloaded.',
+        icon: 'info',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }, []);
+
+    const handleViewUserManual = useCallback(() => {
+      const pdfUrl = '/pdf/MIPHI_Installation_Guide.pdf'; // IMPORTANT: Replace with the ACTUAL PATH to your PDF in the public folder
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.setAttribute('download', 'MIPHI_User_Manual.pdf'); // Suggested filename for download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      // Optional: brief confirmation
+      Swal.fire({
+        title: 'Downloading...',
+        text: 'User Manual will be downloaded.',
+        icon: 'info',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }, []);
+
     const userItems = [
       { icon: FileText, label: "My Registrations", page: "registrations" },
-      { icon: ShieldCheck, label: "Warranty Claim", page: "warrantyClaim" },
+      { icon: ShieldCheck, label: "Warranty Claim", page: "warrantyClaim" }, // Navigates to the claim form page
+      // New Items:
+      { icon: Download, label: "Installation Guide", action: handleDownloadInstallationGuide, id: "downloadGuideLink" }, // Use id if no page
+      { icon: BookOpenCheck, label: "User Manual", action: handleViewUserManual, id: "viewManualLink" }, // Use id if no page
       ...commonItems
     ];
+
     const adminItems = [
       { icon: FileText, label: "All Registrations", page: "allRegistrations" },
       { icon: ListChecks, label: "Warranty Reports", page: "warrantyReports" },
@@ -422,83 +483,94 @@ export default function ProductRegistrationsCRM() {
     ];
     const navItems = isAdmin ? adminItems : userItems;
 
-    // Determine sidebar classes based on state and windowWidth
+    // Determine sidebar classes (your existing logic for this is fine)
     let sidebarVisibilityClasses = "";
     let sidebarWidthClasses = "";
 
-    if (windowWidth < 1024) { // Mobile/Tablet view
+    if (windowWidth < 1024) {
       sidebarVisibilityClasses = isMobileMenuOpen ? "translate-x-0" : "-translate-x-full";
-      sidebarWidthClasses = "w-64"; // Mobile menu is always full width when open
-    } else { // Desktop view
-      sidebarVisibilityClasses = "translate-x-0"; // Always visible on desktop
-      sidebarWidthClasses = isSidebarOpen ? "w-64" : "w-20"; // Collapsible width
+      sidebarWidthClasses = "w-64";
+    } else {
+      sidebarVisibilityClasses = "translate-x-0";
+      sidebarWidthClasses = isSidebarOpen ? "w-64" : "w-20";
     }
 
     return (
-    <div className="flex flex-col"> {/* Container for overlay and aside */}
-      {/* Mobile Menu Overlay - shown when mobile menu is open */}
-      {isMobileMenuOpen && windowWidth < 1024 && (
-        <div
-          className="fixed inset-0 z-30 bg-black bg-opacity-50 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)} // Close on overlay click
-        ></div>
-      )}
-      <aside 
-        className={`fixed top-0 left-0 z-40 h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-white 
-                   flex-shrink-0 flex flex-col shadow-2xl transition-all duration-300 ease-in-out
-                   ${sidebarVisibilityClasses} ${sidebarWidthClasses}`}
-      >
-        <div className={`flex items-center justify-between p-6 border-b border-slate-700 
-                       ${(!isSidebarOpen && windowWidth >= 1024) ? "justify-center p-4" : ""}
-                       ${(windowWidth < 1024 && isMobileMenuOpen) ? "justify-between" : "" }`} // Ensure X is visible on mobile
+      <div className="flex flex-col">
+        {isMobileMenuOpen && windowWidth < 1024 && (
+          <div
+            className="fixed inset-0 z-30 bg-black bg-opacity-50 lg:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          ></div>
+        )}
+        <aside
+          className={`fixed top-0 left-0 z-40 h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-white 
+                      flex-shrink-0 flex flex-col shadow-2xl transition-all duration-300 ease-in-out
+                      ${sidebarVisibilityClasses} ${sidebarWidthClasses}`}
         >
-          <a href="#" className="flex items-center space-x-2" onClick={() => handleSidebarNavClick(isAdmin ? 'allRegistrations' : 'registrations')}>
-            {/* Show full logo if sidebar is open OR if it's the mobile menu (which is always "open" in terms of content display) */}
-            <Package size={(isSidebarOpen || windowWidth < 1024) ? 32 : 24} className="text-indigo-400" />
-            {(isSidebarOpen || windowWidth < 1024) && <span className="text-2xl font-bold">ProductVault</span>}
-          </a>
-          {/* Mobile X button - only visible and needed when mobile menu is open */}
-          {windowWidth < 1024 && isMobileMenuOpen && (
-            <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
-              <X size={24} />
-            </button>
-          )}
-        </div>
-        <nav className="flex-grow p-4 space-y-1">
-          {navItems.map((item) => (
-            <a
-              key={item.page}
-              href="#"
-              onClick={(e) => { e.preventDefault(); handleSidebarNavClick(item.page); }}
-              className={`flex items-center 
-                         ${(isSidebarOpen || windowWidth < 1024) ? "space-x-3 px-4" : "justify-center"} 
-                         py-3 rounded-lg hover:bg-slate-700 transition-colors duration-150 
-                         ${currentPage === item.page ? "bg-indigo-600 text-white shadow-md" : "text-slate-300 hover:text-white"}`}
-              title={item.label}
-            >
-              <item.icon size={20} className="flex-shrink-0"/>
-              {(isSidebarOpen || windowWidth < 1024) && <span>{item.label}</span>}
+          <div className={`flex items-center justify-between p-6 border-b border-slate-700 
+                          ${(!isSidebarOpen && windowWidth >= 1024) ? "justify-center p-4" : ""}
+                          ${(windowWidth < 1024 && isMobileMenuOpen) ? "justify-between" : ""}`}
+          >
+            <a href="#" className="flex items-center space-x-2" onClick={() => handleSidebarNavClick(isAdmin ? 'allRegistrations' : 'registrations')}>
+              <Package size={(isSidebarOpen || windowWidth < 1024) ? 32 : 24} className="text-indigo-400" />
+              {(isSidebarOpen || windowWidth < 1024) && <span className="text-2xl font-bold">ProductVault</span>}
             </a>
-          ))}
-        </nav>
-        <div
-      className={`p-6 border-t border-slate-700 
-                 ${(!isSidebarOpen && windowWidth >= 1024) ? "flex justify-center p-4" : ""}`}
-    >
-      <a
-        href="#"
-        className={`flex items-center 
-                   ${(isSidebarOpen || windowWidth < 1024) ? "space-x-3 px-4" : "justify-center"} 
-                   py-3 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors duration-150`}
-        onClick={handleLogout}
-        title="Logout"
-      >
-        <LogOut size={20} className="flex-shrink-0" />
-        {(isSidebarOpen || windowWidth < 1024) && <span>Logout</span>}
-      </a>
-    </div>
-      </aside>
-    </div>
+            {windowWidth < 1024 && isMobileMenuOpen && (
+              <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
+                <X size={24} />
+              </button>
+            )}
+          </div>
+          <nav className="flex-grow p-4 space-y-1">
+            {navItems.map((item) => (
+              <a
+                key={item.id || item.page || item.label} // Ensure a unique key
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (item.action) {
+                    item.action(); // Execute the action directly
+                    // For actions, we usually don't change the 'currentPage' or close mobile menu
+                    // unless the action itself should trigger that.
+                    if (windowWidth < 1024 && isMobileMenuOpen && (item.id === "downloadGuideLink" || item.id === "viewManualLink")) {
+                      // Optionally keep mobile menu open for downloads/new tabs, or close it:
+                      // setIsMobileMenuOpen(false); 
+                    }
+                  } else if (item.page) {
+                    handleSidebarNavClick(item.page); // This will change view and close mobile menu
+                  }
+                }}
+                className={`flex items-center 
+                            ${(isSidebarOpen || windowWidth < 1024) ? "space-x-3 px-4" : "justify-center"} 
+                            py-3 rounded-lg hover:bg-slate-700 transition-colors duration-150 
+                            ${(item.page && currentPage === item.page) ? "bg-indigo-600 text-white shadow-md" : "text-slate-300 hover:text-white"}`}
+                // Action items (without a 'page' property matching currentPage) won't get the active highlight by default.
+                title={item.label}
+              >
+                <item.icon size={20} className="flex-shrink-0" />
+                {(isSidebarOpen || windowWidth < 1024) && <span>{item.label}</span>}
+              </a>
+            ))}
+          </nav>
+          <div
+            className={`p-6 border-t border-slate-700 
+                        ${(!isSidebarOpen && windowWidth >= 1024) ? "flex justify-center p-4" : ""}`}
+          >
+            <a
+              href="#"
+              className={`flex items-center 
+                          ${(isSidebarOpen || windowWidth < 1024) ? "space-x-3 px-4" : "justify-center"} 
+                          py-3 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors duration-150`}
+              onClick={handleLogout}
+              title="Logout"
+            >
+              <LogOut size={20} className="flex-shrink-0" />
+              {(isSidebarOpen || windowWidth < 1024) && <span>Logout</span>}
+            </a>
+          </div>
+        </aside>
+      </div>
     )
   };
 
@@ -506,60 +578,59 @@ export default function ProductRegistrationsCRM() {
   const TopBar = () => {
     let title = "Dashboard";
     if (isAdmin) {
-        switch(currentPage) {
-            case 'allRegistrations': title = 'All Product Registrations'; break;
-            case 'warrantyReports': title = 'Warranty Reports Management'; break;
-            case 'manageProducts': title = 'Manage Products'; break;
-            case 'settings': title = 'Admin Settings'; break;
-            default: title = 'Admin Dashboard';
-        }
+      switch (currentPage) {
+        case 'allRegistrations': title = 'All Product Registrations'; break;
+        case 'warrantyReports': title = 'Warranty Reports Management'; break;
+        case 'manageProducts': title = 'Manage Products'; break;
+        case 'settings': title = 'Admin Settings'; break;
+        default: title = 'Admin Dashboard';
+      }
     } else {
-        switch(currentPage) {
-            case 'registrations': title = 'My Product Registrations'; break;
-            case 'warrantyClaim': title = 'Warranty Claim'; break;
-            case 'settings': title = 'User Settings'; break;
-            default: title = 'User Dashboard';
-        }
+      switch (currentPage) {
+        case 'registrations': title = 'My Product Registrations'; break;
+        case 'warrantyClaim': title = 'Warranty Claim'; break;
+        case 'settings': title = 'User Settings'; break;
+        default: title = 'User Dashboard';
+      }
     }
 
     return (
-    <header className="bg-white shadow-md sticky top-0 z-20 transition-all duration-300"> {/* Lowered z-index for TopBar */}
-      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
-            <button
-              onClick={toggleSidebar}
-              className="text-slate-500 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 mr-3"
-            >
-              <span className="sr-only">Toggle sidebar</span>
-              <Menu size={24} />
-            </button>
-          </div>
-          <div className="flex-1 flex justify-center items-center">
-            <h1 className="text-xl font-semibold text-slate-800 px-2 truncate">
-              {title}
-            </h1>
-          </div>
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            <div className="relative">
-              <button className="flex items-center space-x-2 p-1 rounded-full">
-                {/* <span className="hidden sm:inline text-sm font-medium text-slate-700">{user?.name || userEmail?.split('@')[0] || 'User'}</span> */}
-                <img
-                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover border-2 border-indigo-200"
-                  src={
-                    user?.avatar ||
-                    `https://ui-avatars.com/api/?name=${
-                      encodeURIComponent(user?.name || userEmail?.split('@')[0] || (isAdmin ? 'Admin' : 'User'))
-                    }&background=6b7280&color=fff`
-                  }
-                  alt="User avatar"
-                />
+      <header className="bg-white shadow-md sticky top-0 z-20 transition-all duration-300"> {/* Lowered z-index for TopBar */}
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <button
+                onClick={toggleSidebar}
+                className="text-slate-500 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 mr-3"
+              >
+                <span className="sr-only">Toggle sidebar</span>
+                <Menu size={24} />
               </button>
+            </div>
+            <div className="flex-1 flex justify-center items-center">
+              <h1 className="text-xl font-semibold text-slate-800 px-2 truncate">
+                {title}
+              </h1>
+            </div>
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="relative">
+                <button className="flex items-center space-x-2 p-1 rounded-full">
+                  {/* <span className="hidden sm:inline text-sm font-medium text-slate-700">{user?.name || userEmail?.split('@')[0] || 'User'}</span> */}
+                  <img
+                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover border-2 border-indigo-200"
+                    src={
+                      user?.avatar ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || userEmail?.split('@')[0] || (isAdmin ? 'Admin' : 'User'))
+                      }&background=6b7280&color=fff`
+                    }
+                    alt="User avatar"
+                  />
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
     )
   };
 
@@ -575,7 +646,7 @@ export default function ProductRegistrationsCRM() {
     const [formData, setFormData] = useState({
       product_name: '', serial_number: '', message: '',
     });
-  
+
     useEffect(() => {
       if (prefillData) {
         setFormData({
@@ -584,31 +655,31 @@ export default function ProductRegistrationsCRM() {
           message: '',
         });
       } else {
-        setFormData({ product_name: '', serial_number: '',  message: '' });
+        setFormData({ product_name: '', serial_number: '', message: '' });
       }
     }, [prefillData]);
-  
+
     const handleChange = (e) => {
       const { name, value } = e.target;
       setFormData(prev => ({ ...prev, [name]: value }));
     };
-   const handleLogout = (e) => {
-    e.preventDefault();
+    const handleLogout = (e) => {
+      e.preventDefault();
 
-    Swal.fire({
-      title: 'Are you sure you want to logout?',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Logout',
-      cancelButtonText: 'Cancel',
-    }).then((result) => {
-      if (result.isConfirmed) {
-        sessionStorage.removeItem('user');
-        sessionStorage.removeItem('token');
-        navigate('/'); // redirect to home or login page
-      }
-    });
-  };
+      Swal.fire({
+        title: 'Are you sure you want to logout?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Logout',
+        cancelButtonText: 'Cancel',
+      }).then((result) => {
+        if (result.isConfirmed) {
+          sessionStorage.removeItem('user');
+          sessionStorage.removeItem('token');
+          navigate('/'); // redirect to home or login page
+        }
+      });
+    };
     const handleSubmit = async (e) => {
       e.preventDefault();
       setIsSubmitting(true);
@@ -616,7 +687,7 @@ export default function ProductRegistrationsCRM() {
         title: 'Submitting...', text: 'Please wait while we submit your warranty claim.',
         allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }
       });
-  
+
       try {
         const currentEmail = user?.email || '';
         const claimData = {
@@ -625,12 +696,12 @@ export default function ProductRegistrationsCRM() {
           customer_remarks: formData.message
         };
         const token = sessionStorage.getItem('token');
-        if(!token) {
+        if (!token) {
           setError("No token found. Please log in again.");
           return;
         }
         const response = await fetch('https://miphi-blog-backend.vercel.app/warranty', {
-          method: 'POST', 
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
@@ -638,7 +709,7 @@ export default function ProductRegistrationsCRM() {
           body: JSON.stringify(claimData),
         });
         const result = await response.json();
-    
+
         if (!response.ok) {
           throw new Error(result.error || 'Failed to submit warranty claim');
         }
@@ -652,7 +723,7 @@ export default function ProductRegistrationsCRM() {
           setSelectedRegistrationForClaim(null);
           setCurrentPage('registrations');
         }, 2000);
-    
+
       } catch (error) {
         console.error("Error submitting warranty claim:", error);
         Swal.fire({ icon: 'error', title: 'Submission Failed', text: `Error: ${error.message}` });
@@ -660,7 +731,7 @@ export default function ProductRegistrationsCRM() {
         setIsSubmitting(false);
       }
     };
-    
+
     return (
       <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200 max-w-3xl mx-auto">
         <h2 className="text-2xl font-semibold mb-6 text-slate-800 flex items-center">
@@ -703,13 +774,13 @@ export default function ProductRegistrationsCRM() {
     const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
     const [message, setMessage] = useState({ type: '', text: '' });
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-  
+
     const handleChange = (e) => {
       const { name, value } = e.target;
       setPasswordForm(prev => ({ ...prev, [name]: value }));
       setMessage({ type: '', text: '' });
     };
-  
+
     const handlePasswordChange = async (e) => {
       e.preventDefault();
       setMessage({ type: '', text: '' });
@@ -726,7 +797,7 @@ export default function ProductRegistrationsCRM() {
       setIsUpdatingPassword(true);
       try {
         const token = sessionStorage.getItem('token');
-        if(!token) {
+        if (!token) {
           setError("No token found. Please log in again.");
           return;
         }
@@ -740,7 +811,7 @@ export default function ProductRegistrationsCRM() {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || `Server error: ${response.status}`);
-        
+
         Swal.fire({ icon: 'success', title: 'Success!', text: result.message || 'Password updated successfully!', timer: 2000, showConfirmButton: false });
         setPasswordForm({ newPassword: '', confirmPassword: '' });
         // setMessage({ type: 'success', text: result.message || 'Password updated successfully!' }); // Swal handles this
@@ -752,21 +823,21 @@ export default function ProductRegistrationsCRM() {
         setIsUpdatingPassword(false);
       }
     };
-  
+
     return (
       <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200 max-w-2xl mx-auto">
         <h2 className="text-2xl font-semibold mb-6 text-slate-800 flex items-center">
           <Settings className="mr-3 text-indigo-600" size={28} /> Account Settings
         </h2>
         <div className="mb-8 pb-6 border-b border-slate-200">
-          <h3 className="text-xl font-semibold text-slate-700 mb-4 flex items-center"><Key className="mr-2 text-slate-500" size={20}/> Change Password</h3>
+          <h3 className="text-xl font-semibold text-slate-700 mb-4 flex items-center"><Key className="mr-2 text-slate-500" size={20} /> Change Password</h3>
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div>
-              <label htmlFor="newPasswordSet"className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
+              <label htmlFor="newPasswordSet" className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
               <input type="password" name="newPassword" id="newPasswordSet" value={passwordForm.newPassword} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
             </div>
             <div>
-              <label htmlFor="confirmPasswordSet"className="block text-sm font-medium text-slate-700 mb-1">Confirm New Password</label>
+              <label htmlFor="confirmPasswordSet" className="block text-sm font-medium text-slate-700 mb-1">Confirm New Password</label>
               <input type="password" name="confirmPassword" id="confirmPasswordSet" value={passwordForm.confirmPassword} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
             </div>
             {message.text && !isUpdatingPassword && ( // Show local message only if not using Swal or if error before Swal
@@ -780,7 +851,7 @@ export default function ProductRegistrationsCRM() {
               >
                 {isUpdatingPassword ? (
                   <><svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Updating...</>
-                ) : ( 'Change Password' )}
+                ) : ('Change Password')}
               </button>
             </div>
           </form>
@@ -790,57 +861,82 @@ export default function ProductRegistrationsCRM() {
   };
 
   // --- ADMIN: All Registrations View Component (Placeholder) ---
-  const AllRegistrationsView = () => {
-    const [searchTerm, setSearchTerm] = useState('');
-    
-    // Filter items based only on serial number
-    const filteredItems = searchTerm
-      ? allRegistrations.filter(reg => 
-          (reg.serial_number || '').toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      : allRegistrations;
-  
-    return (
-      <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
-          <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={18}/>
-              <input
-                type="text"
-                placeholder="Search by serial number..."
-                className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow text-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-          </div>
-          <p className="text-slate-600 text-sm whitespace-nowrap">
-              Showing <span className="font-semibold text-indigo-600">{filteredItems.length}</span> of <span className="font-semibold text-indigo-600">{allRegistrations.length}</span> total registrations
-          </p>
+ const AllRegistrationsView = () => {
+  const [viewSearchTerm, setViewSearchTerm] = useState(''); // Local search term for this view
+  const [currentPageForTable, setCurrentPageForTable] = useState(1); // Page state for this table
+  const [itemsPerPage] = useState(10); // Show 10 items per page
+
+  // Reset to page 1 whenever the search term changes or the underlying allRegistrations data changes
+  useEffect(() => {
+    setCurrentPageForTable(1);
+  }, [viewSearchTerm, allRegistrations]); // allRegistrations is from the parent scope
+
+  // Filter items based on serial number, user name, or user email
+  const filteredItems = useMemo(() => {
+    if (!viewSearchTerm) return allRegistrations; // allRegistrations is from the parent component's state
+    const lowerSearchTerm = viewSearchTerm.toLowerCase();
+    return allRegistrations.filter(reg =>
+      (reg.name || '').toLowerCase().includes(lowerSearchTerm) ||
+      (reg.email || '').toLowerCase().includes(lowerSearchTerm) ||
+      (reg.product_name || '').toLowerCase().includes(lowerSearchTerm) ||
+      (reg.serial_number || '').toLowerCase().includes(lowerSearchTerm)
+    );
+  }, [allRegistrations, viewSearchTerm]);
+
+  // Pagination Logic
+  const indexOfLastItem = currentPageForTable * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItemsToDisplay = filteredItems.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+
+  const handlePaginate = (pageNumber) => {
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setCurrentPageForTable(pageNumber);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
+        <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={18}/>
+          <input
+            type="text"
+            placeholder="Search by name, email, product, S/N..."
+            className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow text-sm"
+            value={viewSearchTerm}
+            onChange={(e) => setViewSearchTerm(e.target.value)}
+          />
         </div>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-6 border-b border-slate-200">
-          <div>
-              <h2 className="text-2xl font-semibold text-slate-800">All User Registrations</h2>
-              <p className="text-sm text-slate-500 mt-1">View and manage all product registrations across users.</p>
-          </div>
+        <p className="text-slate-600 text-sm whitespace-nowrap">
+          Showing <span className="font-semibold text-indigo-600">{currentItemsToDisplay.length}</span> of <span className="font-semibold text-indigo-600">{filteredItems.length}</span> results ({allRegistrations.length} total)
+        </p>
+      </div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-6 border-b border-slate-200">
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-800">All User Registrations</h2>
+          <p className="text-sm text-slate-500 mt-1">View and manage all product registrations across users.</p>
         </div>
-  
-        {allRegistrations.length === 0 && !searchTerm ? (
-          <div className="text-center py-12">
-              <Package className="mx-auto mb-6 text-slate-400" size={64} />
-              <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Registrations Found</h2>
-              <p className="text-slate-500 max-w-md mx-auto">There are currently no product registrations in the system.</p>
-          </div>
-        ) : filteredItems.length === 0 && searchTerm ? (
-          <div className="text-center py-12">
-              <Search className="mx-auto mb-6 text-slate-400" size={64} />
-              <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Matching Serial Number</h2>
-              <p className="text-slate-500 mb-6 max-w-md mx-auto">Your search for serial number "{searchTerm}" did not match any registrations.</p>
-              <button
-                  className="px-6 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium transition-colors focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
-                  onClick={() => setSearchTerm("")}
-              > Clear Search </button>
-          </div>
-        ) : (
+      </div>
+
+      {allRegistrations.length === 0 && !viewSearchTerm ? (
+        <div className="text-center py-12">
+          <Package className="mx-auto mb-6 text-slate-400" size={64} />
+          <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Registrations Found</h2>
+          <p className="text-slate-500 max-w-md mx-auto">There are currently no product registrations in the system.</p>
+        </div>
+      ) : currentItemsToDisplay.length === 0 && viewSearchTerm ? (
+        <div className="text-center py-12">
+          <Search className="mx-auto mb-6 text-slate-400" size={64} />
+          <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Matching Registrations</h2>
+          <p className="text-slate-500 mb-6 max-w-md mx-auto">Your search for "{viewSearchTerm}" did not match any registrations.</p>
+          <button
+            className="px-6 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium transition-colors focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+            onClick={() => setViewSearchTerm("")} // Clears the local search term
+          > Clear Search </button>
+        </div>
+      ) : (
+        <>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1000px] divide-y divide-slate-200">
               <thead className="bg-slate-50">
@@ -852,480 +948,616 @@ export default function ProductRegistrationsCRM() {
                   <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
                   <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered On</th>
                   <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Invoice PDF</th>
-  
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-200">
-                {filteredItems.map((reg, index) => (
-                  <tr key={index} className="hover:bg-slate-50 transition-colors group">
+                {currentItemsToDisplay.map((reg, index) => ( // Iterate over currentItemsToDisplay
+                  <tr key={reg.id || `${reg.serial_number}-${index}`} className="hover:bg-slate-50 transition-colors group"> {/* Ensure unique key */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{reg.name || 'N/A'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{reg.email || 'N/A'}</td>
-                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">
-                        {
-                          (reg.country_code && reg.mobile_number) // Check if both exist
-                            ? `${reg.country_code} ${reg.mobile_number}` // Display with a space
-                            : (reg.country_code || '') + (reg.mobile_number || '') || 'N/A' // Fallback: display whichever part exists, or N/A
-                        }
-                      </td>
-  
-                      <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center text-sm text-slate-700">
-                              
-                                  <Package className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={24} />
-                                  {reg.product_name || "General"}
-                          </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center text-sm text-slate-700">
-                              <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
-                              {reg.serial_number || "N/A"}
-                          </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center text-sm text-slate-700">
-                              <Calendar className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
-                              {formatDate(reg.registered_at)}
-                          </div>
-                      </td>
-                      
-                      <td className="px-6 py-4 whitespace-nowrap ">
-                          <div className="flex items-center ">
-                              <button onClick={() => downloadInvoice(reg.product_name, reg.serial_number)} disabled={!reg.invoice_receipt} className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs" title={!reg.invoice_receipt ? "Invoice not available" : "Download Invoice"}>
-                                  <Download className="mr-1.5" size={14} /> Invoice
-                              </button>
-                          </div>
-                      </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{reg.email || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">
+                      {
+                        (reg.country_code && reg.mobile_number)
+                          ? `${reg.country_code} ${reg.mobile_number}`
+                          : (reg.country_code || '') + (reg.mobile_number || '') || 'N/A'
+                      }
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center text-sm text-slate-700">
+                        <Package className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={24} />
+                        {reg.product_name || "General"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center text-sm text-slate-700">
+                        <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
+                        {reg.serial_number || "N/A"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center text-sm text-slate-700">
+                        <Calendar className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
+                        {formatDate(reg.registered_at)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap ">
+                      <div className="flex items-center ">
+                        <button onClick={() => downloadInvoice(reg.id, reg.product_name, reg.serial_number)} disabled={!reg.invoice_receipt} className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs" title={!reg.invoice_receipt ? "Invoice not available" : "Download Invoice"}>
+                          <Download className="mr-1.5" size={14} /> Invoice
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-      </div>
-    );
-  };
-// --- ADMIN: Warranty Reports View Component (Placeholder) ---
-const WarrantyReportsView = () => {
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <nav className="mt-6 flex flex-col items-center space-y-2 sm:flex-row sm:justify-between" aria-label="Table navigation">
+              <span className="text-sm font-normal text-slate-500">
+                Page <span className="font-semibold text-slate-900">{currentPageForTable}</span> of <span className="font-semibold text-slate-900">{totalPages}</span>
+              </span>
+              <ul className="inline-flex items-center -space-x-px">
+                <li>
+                  <button
+                    onClick={() => handlePaginate(currentPageForTable - 1)}
+                    disabled={currentPageForTable === 1}
+                    className="py-2 px-3 ml-0 leading-tight text-slate-500 bg-white rounded-l-lg border border-slate-300 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                </li>
+                {/* Optional: Page Number Buttons - keeping it simple for now */}
+                {/* Example: Array.from({ length: totalPages }, (_, i) => i + 1).map(page => ...) */}
+                <li>
+                  <button
+                    onClick={() => handlePaginate(currentPageForTable + 1)}
+                    disabled={currentPageForTable === totalPages}
+                    className="py-2 px-3 leading-tight text-slate-500 bg-white rounded-r-lg border border-slate-300 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </li>
+              </ul>
+            </nav>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+  // --- ADMIN: Warranty Reports View Component (Placeholder) ---
+ const WarrantyReportsView = () => {
   const [selectedReportIds, setSelectedReportIds] = useState([]);
   const [groupUpdateStatus, setGroupUpdateStatus] = useState('');
   const [reportSearchTerm, setReportSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   // Single warranty update function
-const handleUpdateStatus = async (serialNumber, newStatus) => {
-setIsSubmitting(true);
-Swal.fire({ title: 'Updating Status...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-try {
-    const token = sessionStorage.getItem('token');
-    if(!token) {
-        setError("No token found. Please log in again.");
-        return;     
-    }
-    // Updated to match your backend API
-    const response = await fetch(`https://miphi-blog-backend.vercel.app/warranty_status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ 
-            serial_number: serialNumber, 
-            claim_status: newStatus 
-        }),
-    });
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to update status.`);
-    }
-    Swal.fire('Success', 'Warranty status updated successfully!', 'success');
-    fetchWarrantyReports(); // Refresh the list
-} catch (error) {
-    console.error("Error updating warranty status:", error);
-    Swal.fire('Error', `Failed to update status: ${error.message}`, 'error');
-} finally {
-    setIsSubmitting(false);
-}
-};
-
-// Group update function
-const handleGroupUpdate = async () => {
-if (selectedReportIds.length === 0 || !groupUpdateStatus) {
-    Swal.fire('Warning', 'Please select reports and a status for group update.', 'warning');
-    return;
-}
-setIsSubmitting(true);
-Swal.fire({ title: 'Updating Selected Reports...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-try {
-    const token = sessionStorage.getItem('token');
-    if(!token) {
-        setError("No token found. Please log in again.");
-        return;
-    }
-    // Process each selected report individually since your backend doesn't support batch updates
-    const updatePromises = selectedReportIds.map(serialNumber => 
-        fetch(`https://miphi-blog-backend.vercel.app/warranty_status`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({ 
-                serial_number: serialNumber, 
-                claim_status: groupUpdateStatus 
-            }),
-        })
-    );
-    
-    const results = await Promise.allSettled(updatePromises);
-    const failures = results.filter(r => r.status === 'rejected').length;
-    
-    if (failures > 0) {
-        Swal.fire('Partial Success', `Updated ${results.length - failures} out of ${results.length} reports. ${failures} updates failed.`, 'warning');
-    } else {
-        Swal.fire('Success', 'Selected warranty statuses updated!', 'success');
-    }
-    
-    fetchWarrantyReports(); // Refresh
-    setSelectedReportIds([]);
-    setGroupUpdateStatus('');
-} catch (error) {
-    console.error("Error in group update:", error);
-    Swal.fire('Error', `Group update failed: ${error.message}`, 'error');
-} finally {
-    setIsSubmitting(false);
-}
-};
-  const toggleSelectReport = (serialNumber) => {
-      setSelectedReportIds(prev => 
-          prev.includes(serialNumber) ? prev.filter(sn => sn !== serialNumber) : [...prev, serialNumber]
-      );
-  };
-  
-  // Updated to filter only by serial number
-  const filteredReports = reportSearchTerm 
-      ? warrantyReports.filter(report => 
-          report.serial_number.toLowerCase().includes(reportSearchTerm.toLowerCase())
-        )
-      : warrantyReports;
-
-  const warrantyStatusOptions = ["Pending", "Approved", "Rejected"];
-
-
-  return (
-      <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
-          <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18}/>
-                    <input 
-                        type="text" 
-                        placeholder="Search by serial number..."
-                        value={reportSearchTerm}
-                        onChange={(e) => setReportSearchTerm(e.target.value)}
-                        className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-          </div>
-          <p className="text-slate-600 text-sm whitespace-nowrap">
-              Showing <span className="font-semibold text-indigo-600">{filteredReports.length}</span> of <span className="font-semibold text-indigo-600">{warrantyReports.length}</span> total registrations
-          </p>
-        </div>
-          <h2 className="text-2xl font-semibold mb-2 text-slate-800">Warranty Claim Reports</h2>
-          <p className="text-sm text-slate-500 mb-6">Review and update the status of all warranty claims.</p>
-
-          <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              
-              {selectedReportIds.length > 0 && (
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                      <select 
-                          value={groupUpdateStatus} 
-                          onChange={(e) => setGroupUpdateStatus(e.target.value)}
-                          className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm h-full"
-                      >
-                          <option value="">Set Status for Selected ({selectedReportIds.length})</option>
-                          {warrantyStatusOptions.map(status => <option key={status} value={status}>{status}</option>)}
-                      </select>
-                      <button 
-                          onClick={handleGroupUpdate}
-                          disabled={isSubmitting || !groupUpdateStatus}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center text-sm h-full disabled:opacity-50"
-                      >
-                         <CheckSquare size={16} className="mr-2"/> Apply to Selected
-                      </button>
-                  </div>
-              )}
-          </div>
-
-
-          {filteredReports.length === 0 ? (
-               <div className="text-center py-12">
-                  <ListChecks className="mx-auto mb-6 text-slate-400" size={64} />
-                  <h2 className="text-2xl font-semibold text-slate-700 mb-2">
-                      {reportSearchTerm ? 'No Matching Reports' : 'No Warranty Reports Found'}
-                  </h2>
-                  <p className="text-slate-500 max-w-md mx-auto">
-                      {reportSearchTerm ? `Your search for "${reportSearchTerm}" did not find any reports.` : 'There are currently no warranty claims to display.'}
-                  </p>
-                  {reportSearchTerm && <button onClick={() => setReportSearchTerm('')} className="mt-4 px-4 py-2 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">Clear Search</button>}
-              </div>
-          ) : (
-          <div className="overflow-x-auto">
-              <table className="w-full min-w-[1200px] divide-y divide-slate-200">
-                  <thead className="bg-slate-50">
-                      <tr>
-                          <th scope="col" className="px-2 py-4 text-center">
-                              <input type="checkbox" className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded" 
-                               onChange={(e) => {
-                                  if (e.target.checked) {
-                                      setSelectedReportIds(filteredReports.map(r => r.serial_number));
-                                  } else {
-                                      setSelectedReportIds([]);
-                                  }
-                               }}
-                               checked={selectedReportIds.length > 0 && selectedReportIds.length === filteredReports.length}
-                               title="Select all visible"
-                              />
-                          </th>
-                          <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
-                          <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">User Email</th>
-            
-                          <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Current Status</th>
-                          <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider min-w-[200px]">Update Status</th>
-                          <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer Remarks</th>
-                      </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-slate-200">
-                      {filteredReports.map((report) => (
-                          <tr key={report.serial_number} className={`${selectedReportIds.includes(report.serial_number) ? 'bg-indigo-50' : 'hover:bg-slate-50'} transition-colors`}>
-                              <td className="px-2 py-4 text-center">
-                                  <input type="checkbox" className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
-                                      checked={selectedReportIds.includes(report.serial_number)}
-                                      onChange={() => toggleSelectReport(report.serial_number)}
-                                  />
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm font-medium text-slate-900">{report.serial_number}</div>
-                                  <div className="text-xs text-slate-500">{report.product_name}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{report.email}</td>
-
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                  ${report.claim_status?.toLowerCase().includes('approved') ? 'bg-green-100 text-green-800' : 
-                                   report.claim_status?.toLowerCase().includes('rejected') ? 'bg-red-100 text-red-800' :
-                                   report.claim_status?.toLowerCase().includes('pending') ? 'bg-yellow-100 text-yellow-800' :
-                                   'bg-slate-100 text-slate-800'}`}>
-                                  {report.claim_status || 'N/A'}
-                                 </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                                  <div className="flex items-center gap-2">
-                                      <select 
-                                          defaultValue={report.claim_status}
-                                          onChange={(e) => handleUpdateStatus(report.serial_number, e.target.value)}
-                                          disabled={isSubmitting}
-                                          className="block w-full pl-3 pr-8 py-2 text-sm border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                                      >
-                                          {warrantyStatusOptions.map(status => <option key={status} value={status}>{status}</option>)}
-                                      </select>
-                                      {/* A save button might be better if changes are not instant */}
-                                  </div>
-                              </td>
-                              <td className="px-6 py-4 text-sm text-slate-600 max-w-xs truncate" title={report.customer_remarks}>
-                                  {report.customer_remarks || 'No remarks'}
-                              </td>
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
-          </div>
-          )}
-      </div>
-  );
-};
-// --- ADMIN: Manage Products View Component (Placeholder) ---
-const ManageProductsView = () => {
-  const [productForm, setProductForm] = useState({ product_name: '', serial_number: '' });
-  const [isAddingProduct, setIsAddingProduct] = useState(false);
-  const [productSearchTerm, setProductSearchTerm] = useState('');
-  const [selectedProductIds, setSelectedProductIds] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [csvFile, setCsvFile] = useState(null);
-  const [isProcessingCsv, setIsProcessingCsv] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [activeTab, setActiveTab] = useState('single'); // 'single' or 'bulk'
-  const fileInputRef = useRef(null);
-
-  const handleProductFormChange = (e) => {
-    const { name, value } = e.target;
-    setProductForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddProduct = async (e) => {
-    e.preventDefault();
-    setIsAddingProduct(true);
-    Swal.fire({ title: 'Adding Product...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+  const handleUpdateStatus = async (serialNumber, newStatus) => {
+    setIsSubmitting(true);
+    Swal.fire({ title: 'Updating Status...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     try {
       const token = sessionStorage.getItem('token');
       if (!token) {
         setError("No token found. Please log in again.");
         return;
       }
-      // ADMIN: API call to add a new product
-      const response = await fetch(`https://miphi-blog-backend.vercel.app/products`, {
+      // Updated to match your backend API
+      const response = await fetch(`https://miphi-blog-backend.vercel.app/warranty_status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(productForm),
+        body: JSON.stringify({
+          serial_number: serialNumber,
+          claim_status: newStatus
+        }),
       });
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to add product.`);
+        throw new Error(errorData.error || `Failed to update status.`);
       }
-      Swal.fire('Success', 'Product added successfully!', 'success');
-      fetchAllProducts(); // Refresh the list
-      setProductForm({ product_name: '', serial_number: '' }); // Reset form
+      Swal.fire('Success', 'Warranty status updated successfully!', 'success');
+      fetchWarrantyReports(); // Refresh the list
     } catch (error) {
-      console.error("Error adding product:", error);
-      Swal.fire('Error', `Failed to add product: ${error.message}`, 'error');
+      console.error("Error updating warranty status:", error);
+      Swal.fire('Error', `Failed to update status: ${error.message}`, 'error');
     } finally {
-      setIsAddingProduct(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleCsvFileChange = (e) => {
-    if (e.target.files.length > 0) {
-      setCsvFile(e.target.files[0]);
-    }
-  };
-
-  const resetFileInput = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-    setCsvFile(null);
-    setUploadProgress(0);
-  };
-
-  const handleCsvUpload = async (e) => {
-    e.preventDefault();
-    if (!csvFile) {
-      Swal.fire('Warning', 'Please select a CSV file to upload.', 'warning');
+  // Group update function
+  const handleGroupUpdate = async () => {
+    if (selectedReportIds.length === 0 || !groupUpdateStatus) {
+      Swal.fire('Warning', 'Please select reports and a status for group update.', 'warning');
       return;
     }
-
-    setIsProcessingCsv(true);
-    Swal.fire({
-      title: 'Processing CSV...',
-      html: 'Preparing to upload products...',
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading();
-      }
-    });
-
+    setIsSubmitting(true);
+    Swal.fire({ title: 'Updating Selected Reports...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     try {
       const token = sessionStorage.getItem('token');
       if (!token) {
         setError("No token found. Please log in again.");
         return;
       }
+      // Process each selected report individually since your backend doesn't support batch updates
+      const updatePromises = selectedReportIds.map(serialNumber =>
+        fetch(`https://miphi-blog-backend.vercel.app/warranty_status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            serial_number: serialNumber,
+            claim_status: groupUpdateStatus
+          }),
+        })
+      );
 
-      // Parse CSV
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const csvText = event.target.result;
-        
-        // Use PapaParse to parse CSV
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          complete: async (results) => {
-            const { data, errors } = results;
+      const results = await Promise.allSettled(updatePromises);
+      const failures = results.filter(r => r.status === 'rejected').length;
+
+      if (failures > 0) {
+        Swal.fire('Partial Success', `Updated ${results.length - failures} out of ${results.length} reports. ${failures} updates failed.`, 'warning');
+      } else {
+        Swal.fire('Success', 'Selected warranty statuses updated!', 'success');
+      }
+
+      fetchWarrantyReports(); // Refresh
+      setSelectedReportIds([]);
+      setGroupUpdateStatus('');
+    } catch (error) {
+      console.error("Error in group update:", error);
+      Swal.fire('Error', `Group update failed: ${error.message}`, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleSelectReport = (serialNumber) => {
+    setSelectedReportIds(prev =>
+      prev.includes(serialNumber) ? prev.filter(sn => sn !== serialNumber) : [...prev, serialNumber]
+    );
+  };
+
+  // Updated to filter only by serial number
+  const filteredReports = reportSearchTerm
+    ? warrantyReports.filter(report =>
+        report.serial_number.toLowerCase().includes(reportSearchTerm.toLowerCase())
+      )
+    : warrantyReports;
+
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredReports.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  const goToNextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  const goToPrevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+
+  const warrantyStatusOptions = ["Pending", "Approved", "Rejected"];
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
+        <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+          <input
+            type="text"
+            placeholder="Search by serial number..."
+            value={reportSearchTerm}
+            onChange={(e) => setReportSearchTerm(e.target.value)}
+            className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+        <p className="text-slate-600 text-sm whitespace-nowrap">
+          Showing <span className="font-semibold text-indigo-600">{filteredReports.length}</span> of <span className="font-semibold text-indigo-600">{warrantyReports.length}</span> total registrations
+        </p>
+      </div>
+      <h2 className="text-2xl font-semibold mb-2 text-slate-800">Warranty Claim Reports</h2>
+      <p className="text-sm text-slate-500 mb-6">Review and update the status of all warranty claims.</p>
+
+      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {selectedReportIds.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <select
+              value={groupUpdateStatus}
+              onChange={(e) => setGroupUpdateStatus(e.target.value)}
+              className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm h-full"
+            >
+              <option value="">Set Status for Selected ({selectedReportIds.length})</option>
+              {warrantyStatusOptions.map(status => <option key={status} value={status}>{status}</option>)}
+            </select>
+            <button
+              onClick={handleGroupUpdate}
+              disabled={isSubmitting || !groupUpdateStatus}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center text-sm h-full disabled:opacity-50"
+            >
+              <CheckSquare size={16} className="mr-2" /> Apply to Selected
+            </button>
+          </div>
+        )}
+      </div>
+
+      {filteredReports.length === 0 ? (
+        <div className="text-center py-12">
+          <ListChecks className="mx-auto mb-6 text-slate-400" size={64} />
+          <h2 className="text-2xl font-semibold text-slate-700 mb-2">
+            {reportSearchTerm ? 'No Matching Reports' : 'No Warranty Reports Found'}
+          </h2>
+          <p className="text-slate-500 max-w-md mx-auto">
+            {reportSearchTerm ? `Your search for "${reportSearchTerm}" did not find any reports.` : 'There are currently no warranty claims to display.'}
+          </p>
+          {reportSearchTerm && <button onClick={() => setReportSearchTerm('')} className="mt-4 px-4 py-2 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">Clear Search</button>}
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1200px] divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th scope="col" className="px-2 py-4 text-center">
+                    <input type="checkbox" className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          // Only select items on the current page
+                          const currentPageIds = currentItems.map(r => r.serial_number);
+                          setSelectedReportIds(prev => {
+                            const existingSelected = prev.filter(id => !currentPageIds.includes(id));
+                            return [...existingSelected, ...currentPageIds];
+                          });
+                        } else {
+                          // Deselect items on current page only
+                          const currentPageIds = currentItems.map(r => r.serial_number);
+                          setSelectedReportIds(prev => prev.filter(id => !currentPageIds.includes(id)));
+                        }
+                      }}
+                      checked={currentItems.length > 0 && currentItems.every(item => selectedReportIds.includes(item.serial_number))}
+                      title="Select all on this page"
+                    />
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">User Email</th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Current Status</th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider min-w-[200px]">Update Status</th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer Remarks</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-200">
+                {currentItems.map((report) => (
+                  <tr key={report.serial_number} className={`${selectedReportIds.includes(report.serial_number) ? 'bg-indigo-50' : 'hover:bg-slate-50'} transition-colors`}>
+                    <td className="px-2 py-4 text-center">
+                      <input type="checkbox" className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
+                        checked={selectedReportIds.includes(report.serial_number)}
+                        onChange={() => toggleSelectReport(report.serial_number)}
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-slate-900">{report.serial_number}</div>
+                      <div className="text-xs text-slate-500">{report.product_name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{report.email}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                ${report.claim_status?.toLowerCase().includes('approved') ? 'bg-green-100 text-green-800' :
+                                  report.claim_status?.toLowerCase().includes('rejected') ? 'bg-red-100 text-red-800' :
+                                  report.claim_status?.toLowerCase().includes('pending') ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-slate-100 text-slate-800'}`}>
+                        {report.claim_status || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                      <div className="flex items-center gap-2">
+                        <select
+                          defaultValue={report.claim_status}
+                          onChange={(e) => handleUpdateStatus(report.serial_number, e.target.value)}
+                          disabled={isSubmitting}
+                          className="block w-full pl-3 pr-8 py-2 text-sm border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        >
+                          {warrantyStatusOptions.map(status => <option key={status} value={status}>{status}</option>)}
+                        </select>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-600 max-w-xs truncate" title={report.customer_remarks}>
+                      {report.customer_remarks || 'No remarks'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Component */}
+          <div className="mt-6 flex items-center justify-between">
+            <div className="text-sm text-slate-600">
+              Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
+              <span className="font-medium">{Math.min(indexOfLastItem, filteredReports.length)}</span> of{" "}
+              <span className="font-medium">{filteredReports.length}</span> entries
+            </div>
             
-            if (errors.length > 0) {
-              Swal.fire('Error', 'CSV parsing error. Please check your CSV format.', 'error');
-              setIsProcessingCsv(false);
-              return;
-            }
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={goToPrevPage}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              
+              <div className="flex items-center space-x-1">
+                {/* Show first page */}
+                {currentPage > 3 && (
+                  <>
+                    <button
+                      onClick={() => paginate(1)}
+                      className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                    >
+                      1
+                    </button>
+                    {currentPage > 4 && (
+                      <span className="px-1 text-slate-500">...</span>
+                    )}
+                  </>
+                )}
+                
+                {/* Show nearby pages */}
+                {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                  // Calculate the page number to display
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  // Only show the button if the page number is valid
+                  if (pageNum > 0 && pageNum <= totalPages) {
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => paginate(pageNum)}
+                        className={`px-3 py-1 rounded-md ${
+                          currentPage === pageNum
+                            ? "bg-indigo-600 text-white"
+                            : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  }
+                  return null;
+                })}
+                
+                {/* Show last page */}
+                {totalPages > 5 && currentPage < totalPages - 2 && (
+                  <>
+                    {currentPage < totalPages - 3 && (
+                      <span className="px-1 text-slate-500">...</span>
+                    )}
+                    <button
+                      onClick={() => paginate(totalPages)}
+                      className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+              </div>
+              
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+  // --- ADMIN: Manage Products View Component (Placeholder) ---
+  const ManageProductsView = () => {
+    const [productForm, setProductForm] = useState({ product_name: '', serial_number: '' });
+    const [isAddingProduct, setIsAddingProduct] = useState(false);
+    const [productSearchTerm, setProductSearchTerm] = useState('');
+    const [selectedProductIds, setSelectedProductIds] = useState([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [csvFile, setCsvFile] = useState(null);
+    const [isProcessingCsv, setIsProcessingCsv] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [activeTab, setActiveTab] = useState('single'); // 'single' or 'bulk'
+    const fileInputRef = useRef(null);
 
-            if (data.length === 0) {
-              Swal.fire('Warning', 'No products found in the CSV file.', 'warning');
-              setIsProcessingCsv(false);
-              return;
-            }
+    const handleProductFormChange = (e) => {
+      const { name, value } = e.target;
+      setProductForm(prev => ({ ...prev, [name]: value }));
+    };
 
-            // Validate required fields
-            for (let i = 0; i < data.length; i++) {
-              if (!data[i].product_name || !data[i].serial_number) {
-                Swal.fire('Error', `Row ${i + 1}: Missing product_name or serial_number.`, 'error');
+    const handleAddProduct = async (e) => {
+      e.preventDefault();
+      setIsAddingProduct(true);
+      Swal.fire({ title: 'Adding Product...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+      try {
+        const token = sessionStorage.getItem('token');
+        if (!token) {
+          setError("No token found. Please log in again.");
+          return;
+        }
+        // ADMIN: API call to add a new product
+        const response = await fetch(`https://miphi-blog-backend.vercel.app/products`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(productForm),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to add product.`);
+        }
+        Swal.fire('Success', 'Product added successfully!', 'success');
+        fetchAllProducts(); // Refresh the list
+        setProductForm({ product_name: '', serial_number: '' }); // Reset form
+      } catch (error) {
+        console.error("Error adding product:", error);
+        Swal.fire('Error', `Failed to add product: ${error.message}`, 'error');
+      } finally {
+        setIsAddingProduct(false);
+      }
+    };
+
+    const handleCsvFileChange = (e) => {
+      if (e.target.files.length > 0) {
+        setCsvFile(e.target.files[0]);
+      }
+    };
+
+    const resetFileInput = () => {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setCsvFile(null);
+      setUploadProgress(0);
+    };
+
+    const handleCsvUpload = async (e) => {
+      e.preventDefault();
+      if (!csvFile) {
+        Swal.fire('Warning', 'Please select a CSV file to upload.', 'warning');
+        return;
+      }
+
+      setIsProcessingCsv(true);
+      Swal.fire({
+        title: 'Processing CSV...',
+        html: 'Preparing to upload products...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      try {
+        const token = sessionStorage.getItem('token');
+        if (!token) {
+          setError("No token found. Please log in again.");
+          return;
+        }
+
+        // Parse CSV
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const csvText = event.target.result;
+
+          // Use PapaParse to parse CSV
+          Papa.parse(csvText, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+              const { data, errors } = results;
+
+              if (errors.length > 0) {
+                Swal.fire('Error', 'CSV parsing error. Please check your CSV format.', 'error');
                 setIsProcessingCsv(false);
                 return;
               }
-            }
 
-            // Process each product
-            let successCount = 0;
-            let failureCount = 0;
-            const errorMessages = [];
+              if (data.length === 0) {
+                Swal.fire('Warning', 'No products found in the CSV file.', 'warning');
+                setIsProcessingCsv(false);
+                return;
+              }
 
-            // Update Swal with progress bar
-            Swal.update({
-              title: 'Uploading Products',
-              html: `
+              // Validate required fields
+              for (let i = 0; i < data.length; i++) {
+                if (!data[i].product_name || !data[i].serial_number) {
+                  Swal.fire('Error', `Row ${i + 1}: Missing product_name or serial_number.`, 'error');
+                  setIsProcessingCsv(false);
+                  return;
+                }
+              }
+
+              // Process each product
+              let successCount = 0;
+              let failureCount = 0;
+              const errorMessages = [];
+
+              // Update Swal with progress bar
+              Swal.update({
+                title: 'Uploading Products',
+                html: `
                 <div class="progress-bar-container" style="width: 100%; background-color: #f3f4f6; border-radius: 8px; overflow: hidden;">
                   <div id="progress-bar" style="height: 20px; width: 0%; background-color: #4f46e5; transition: width 0.3s;"></div>
                 </div>
                 <p style="margin-top: 10px;" id="progress-text">Uploaded 0/${data.length} products...</p>
               `,
-              showConfirmButton: false,
-              allowOutsideClick: false
-            });
+                showConfirmButton: false,
+                allowOutsideClick: false
+              });
 
-            for (let i = 0; i < data.length; i++) {
-              try {
-                const product = data[i];
-                
-                // Update progress
-                const progress = Math.round(((i+1) / data.length) * 100);
-                setUploadProgress(progress);
-                
-                // Update Swal progress bar
-                document.getElementById('progress-bar').style.width = `${progress}%`;
-                document.getElementById('progress-text').innerText = `Uploaded ${i+1}/${data.length} products...`;
+              for (let i = 0; i < data.length; i++) {
+                try {
+                  const product = data[i];
 
-                const response = await fetch(`https://miphi-blog-backend.vercel.app/products`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({
-                    product_name: product.product_name,
-                    serial_number: product.serial_number
-                  }),
-                });
+                  // Update progress
+                  const progress = Math.round(((i + 1) / data.length) * 100);
+                  setUploadProgress(progress);
 
-                if (!response.ok) {
-                  const errorData = await response.json();
-                  throw new Error(errorData.error || `Failed to add product: ${product.serial_number}`);
+                  // Update Swal progress bar
+                  document.getElementById('progress-bar').style.width = `${progress}%`;
+                  document.getElementById('progress-text').innerText = `Uploaded ${i + 1}/${data.length} products...`;
+
+                  const response = await fetch(`https://miphi-blog-backend.vercel.app/products`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      product_name: product.product_name,
+                      serial_number: product.serial_number
+                    }),
+                  });
+
+                  if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `Failed to add product: ${product.serial_number}`);
+                  }
+
+                  successCount++;
+                } catch (error) {
+                  failureCount++;
+                  errorMessages.push(`Row ${i + 1}: ${error.message}`);
+                  console.error("Error adding product:", error);
                 }
-                
-                successCount++;
-              } catch (error) {
-                failureCount++;
-                errorMessages.push(`Row ${i + 1}: ${error.message}`);
-                console.error("Error adding product:", error);
               }
-            }
 
-            // Show results
-            fetchAllProducts(); // Refresh the product list
-            resetFileInput(); // Reset the file input
+              // Show results
+              fetchAllProducts(); // Refresh the product list
+              resetFileInput(); // Reset the file input
 
-            if (failureCount > 0) {
-              Swal.fire({
-                title: 'Upload Completed with Errors',
-                html: `
+              if (failureCount > 0) {
+                Swal.fire({
+                  title: 'Upload Completed with Errors',
+                  html: `
                   <p>Successfully added ${successCount} products.</p>
                   <p>Failed to add ${failureCount} products.</p>
                   <div class="mt-4 text-left max-h-60 overflow-auto">
@@ -1336,410 +1568,423 @@ const ManageProductsView = () => {
                     </ul>
                   </div>
                 `,
-                icon: 'warning'
-              });
-            } else {
-              Swal.fire('Success', `Successfully added all ${successCount} products from the CSV!`, 'success');
-            }
-          },
-          error: (error) => {
-            console.error("CSV parsing error:", error);
-            Swal.fire('Error', `Failed to parse CSV: ${error.message}`, 'error');
-          }
-        });
-      };
-
-      reader.readAsText(csvFile);
-    } catch (error) {
-      console.error("Error processing CSV:", error);
-      Swal.fire('Error', `Failed to process CSV: ${error.message}`, 'error');
-    } finally {
-      setIsProcessingCsv(false);
-    }
-  };
-
-  const handleDeleteProduct = async (serialNumber) => {
-    Swal.fire({
-      title: 'Are you sure?',
-      text: "You won't be able to revert this!",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, delete it!'
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        setIsSubmitting(true);
-        try {
-          const token = sessionStorage.getItem('token');
-          if (!token) {
-            setError("No token found. Please log in again.");
-            return;
-          }
-          // Updated to use serial number for deletion
-          const response = await fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
+                  icon: 'warning'
+                });
+              } else {
+                Swal.fire('Success', `Successfully added all ${successCount} products from the CSV!`, 'success');
+              }
+            },
+            error: (error) => {
+              console.error("CSV parsing error:", error);
+              Swal.fire('Error', `Failed to parse CSV: ${error.message}`, 'error');
             }
           });
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Failed to delete product.`);
-          }
-          Swal.fire('Deleted!', 'Product has been deleted.', 'success');
-          fetchAllProducts(); // Refresh list
-        } catch (error) {
-          console.error("Error deleting product:", error);
-          Swal.fire('Error', `Failed to delete product: ${error.message}`, 'error');
-        } finally {
-          setIsSubmitting(false);
-        }
+        };
+
+        reader.readAsText(csvFile);
+      } catch (error) {
+        console.error("Error processing CSV:", error);
+        Swal.fire('Error', `Failed to process CSV: ${error.message}`, 'error');
+      } finally {
+        setIsProcessingCsv(false);
       }
-    });
-  };
+    };
 
-  // New function for group deletion
-  const handleGroupDelete = async () => {
-    if (selectedProductIds.length === 0) {
-      Swal.fire('Warning', 'Please select products to delete.', 'warning');
-      return;
-    }
-
-    Swal.fire({
-      title: 'Delete Multiple Products?',
-      text: `You are about to delete ${selectedProductIds.length} products. This cannot be undone!`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, delete them!'
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        setIsSubmitting(true);
-        Swal.fire({
-          title: 'Deleting Products...',
-          allowOutsideClick: false,
-          didOpen: () => Swal.showLoading()
-        });
-
-        try {
-          const token = sessionStorage.getItem('token');
-          if (!token) {
-            setError("No token found. Please log in again.");
-            return;
-          }
-          // Process each selected product individually
-          const deletePromises = selectedProductIds.map(serialNumber =>
-            fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
+    const handleDeleteProduct = async (serialNumber) => {
+      Swal.fire({
+        title: 'Are you sure?',
+        text: "You won't be able to revert this!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!'
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          setIsSubmitting(true);
+          try {
+            const token = sessionStorage.getItem('token');
+            if (!token) {
+              setError("No token found. Please log in again.");
+              return;
+            }
+            // Updated to use serial number for deletion
+            const response = await fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
               method: 'DELETE',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`,
               }
-            })
-          );
-
-          const results = await Promise.allSettled(deletePromises);
-          const failures = results.filter(r => r.status === 'rejected').length;
-
-          if (failures > 0) {
-            Swal.fire(
-              'Partial Success',
-              `Deleted ${results.length - failures} out of ${results.length} products. ${failures} deletions failed.`,
-              'warning'
-            );
-          } else {
-            Swal.fire('Success', 'All selected products were deleted!', 'success');
+            });
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || `Failed to delete product.`);
+            }
+            Swal.fire('Deleted!', 'Product has been deleted.', 'success');
+            fetchAllProducts(); // Refresh list
+          } catch (error) {
+            console.error("Error deleting product:", error);
+            Swal.fire('Error', `Failed to delete product: ${error.message}`, 'error');
+          } finally {
+            setIsSubmitting(false);
           }
-
-          fetchAllProducts(); // Refresh the list
-          setSelectedProductIds([]); // Clear selection
-        } catch (error) {
-          console.error("Error in group deletion:", error);
-          Swal.fire('Error', `Group deletion failed: ${error.message}`, 'error');
-        } finally {
-          setIsSubmitting(false);
         }
+      });
+    };
+
+    // New function for group deletion
+    const handleGroupDelete = async () => {
+      if (selectedProductIds.length === 0) {
+        Swal.fire('Warning', 'Please select products to delete.', 'warning');
+        return;
       }
-    });
-  };
 
-  // Toggle product selection for group actions
-  const toggleSelectProduct = (serialNumber) => {
-    setSelectedProductIds(prev =>
-      prev.includes(serialNumber) ? prev.filter(sn => sn !== serialNumber) : [...prev, serialNumber]
-    );
-  };
+      Swal.fire({
+        title: 'Delete Multiple Products?',
+        text: `You are about to delete ${selectedProductIds.length} products. This cannot be undone!`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete them!'
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          setIsSubmitting(true);
+          Swal.fire({
+            title: 'Deleting Products...',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+          });
 
-  // Filter products by serial number
-  const filteredSystemProducts = productSearchTerm
-    ? allProducts.filter(product =>
-      product.serial_number.toLowerCase().includes(productSearchTerm.toLowerCase())
-    )
-    : allProducts;
+          try {
+            const token = sessionStorage.getItem('token');
+            if (!token) {
+              setError("No token found. Please log in again.");
+              return;
+            }
+            // Process each selected product individually
+            const deletePromises = selectedProductIds.map(serialNumber =>
+              fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                }
+              })
+            );
 
-  // Download sample CSV template
-  const downloadSampleCsv = () => {
-    const csvContent = "product_name,serial_number\nProduct 1,SN001\nProduct 2,SN002\nProduct 3,SN003";
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', 'product_template.csv');
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+            const results = await Promise.allSettled(deletePromises);
+            const failures = results.filter(r => r.status === 'rejected').length;
 
-  return (
-    <div className="space-y-8">
-      {/* Add New Product Form */}
-      <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
-        <h2 className="text-2xl font-semibold mb-1 text-slate-800 flex items-center">
-          <PlusCircle className="mr-3 text-indigo-600" size={28} /> Add New Product
-        </h2>
-        <p className="text-sm text-slate-500 mb-6">Define new products that can be registered by users.</p>
-        
-        {/* Tabs for single vs bulk upload */}
-        <div className="mb-6 border-b border-slate-200">
-          <ul className="flex flex-wrap -mb-px text-sm font-medium text-center" role="tablist">
-            <li className="mr-2" role="presentation">
-              <button 
-                className={`inline-block p-4 border-b-2 rounded-t-lg ${activeTab === 'single' ? 'border-indigo-600 text-indigo-600' : 'border-transparent hover:text-indigo-600 hover:border-indigo-600'}`}
-                type="button" 
-                role="tab"
-                aria-selected={activeTab === 'single'}
-                onClick={() => setActiveTab('single')}
-              >
-                One Product Only
-              </button>
-            </li>
-            <li className="mr-2" role="presentation">
-              <button 
-                className={`inline-block p-4 border-b-2 rounded-t-lg ${activeTab === 'bulk' ? 'border-indigo-600 text-indigo-600' : 'border-transparent hover:text-indigo-600 hover:border-indigo-600'}`}
-                type="button" 
-                role="tab"
-                aria-selected={activeTab === 'bulk'}
-                onClick={() => setActiveTab('bulk')}
-              >
-                Add Multiple Products (CSV)
-              </button>
-            </li>
-          </ul>
-        </div>
-        
-        {/* Single Product Form */}
-        <div id="single-product" role="tabpanel" className={activeTab === 'single' ? '' : 'hidden'}>
-          <form onSubmit={handleAddProduct} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="product_name_manage" className="block text-sm font-medium text-slate-700 mb-1">Product Name</label>
-                <input type="text" name="product_name" id="product_name_manage" value={productForm.product_name} onChange={handleProductFormChange} required className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
-              </div>
-              <div>
-                <label htmlFor="serial_number_manage" className="block text-sm font-medium text-slate-700 mb-1">Serial Number</label>
-                <input type="text" name="serial_number" id="serial_number_manage" value={productForm.serial_number} onChange={handleProductFormChange} placeholder="e.g.,SN123" className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
-              </div>
-            </div>
+            if (failures > 0) {
+              Swal.fire(
+                'Partial Success',
+                `Deleted ${results.length - failures} out of ${results.length} products. ${failures} deletions failed.`,
+                'warning'
+              );
+            } else {
+              Swal.fire('Success', 'All selected products were deleted!', 'success');
+            }
 
-            <div>
-              <button type="submit" disabled={isAddingProduct} className="w-full sm:w-auto flex justify-center items-center py-2.5 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60">
-                {isAddingProduct ? 'Adding...' : 'Add Product'}
-              </button>
-            </div>
-          </form>
-        </div>
-        
-        {/* CSV Upload Form */}
-        <div id="csv-upload" role="tabpanel" className={activeTab === 'bulk' ? '' : 'hidden'}>
-          <form onSubmit={handleCsvUpload} className="space-y-4">
-            <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
-              <div className="flex flex-col items-center justify-center space-y-4">
-                <FileUp size={42} className="text-slate-400" />
-                <div className="space-y-1">
-                  <h3 className="text-lg font-medium text-slate-700">Upload CSV File</h3>
-                  <p className="text-sm text-slate-500">
-                    Upload a CSV file with columns: product_name, serial_number
-                  </p>
-                  <p className="text-xs text-indigo-600 hover:underline cursor-pointer" onClick={downloadSampleCsv}>
-                    Download sample template
-                  </p>
-                </div>
-                <input
-                  type="file"
-                  accept=".csv"
-                  ref={fileInputRef}
-                  onChange={handleCsvFileChange}
-                  className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                />
-              </div>
-              {csvFile && (
-                <div className="mt-4 p-3 bg-indigo-50 rounded-lg flex items-center justify-between">
-                  <div className="flex items-center">
-                    <FileText className="text-indigo-600 mr-2" size={18} />
-                    <span className="text-sm font-medium text-slate-700 truncate max-w-xs">
-                      {csvFile.name}
-                    </span>
-                    <span className="text-xs text-slate-500 ml-2">
-                      ({(csvFile.size / 1024).toFixed(2)} KB)
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={resetFileInput}
-                    className="text-slate-500 hover:text-red-600"
+            fetchAllProducts(); // Refresh the list
+            setSelectedProductIds([]); // Clear selection
+          } catch (error) {
+            console.error("Error in group deletion:", error);
+            Swal.fire('Error', `Group deletion failed: ${error.message}`, 'error');
+          } finally {
+            setIsSubmitting(false);
+          }
+        }
+      });
+    };
+
+    // Toggle product selection for group actions
+    const toggleSelectProduct = (serialNumber) => {
+      setSelectedProductIds(prev =>
+        prev.includes(serialNumber) ? prev.filter(sn => sn !== serialNumber) : [...prev, serialNumber]
+      );
+    };
+
+    // Filter products by serial number
+    const filteredSystemProducts = productSearchTerm
+      ? allProducts.filter(product =>
+        product.serial_number.toLowerCase().includes(productSearchTerm.toLowerCase())
+      )
+      : allProducts;
+
+    // Download sample CSV template
+    const downloadSampleCsv = () => {
+      const csvContent = "product_name,serial_number\nProduct 1,SN001\nProduct 2,SN002\nProduct 3,SN003";
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('hidden', '');
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'product_template.csv');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    };
+
+    return (
+      <div className="space-y-8">
+        {/* Add New Product Form */}
+        <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
+          <h2 className="text-2xl font-semibold mb-1 text-slate-800 flex items-center">
+            <PlusCircle className="mr-3 text-indigo-600" size={28} /> Add New Product
+          </h2>
+          <p className="text-sm text-slate-500 mb-6">Define new products that can be registered by users.</p>
+
+          {/* Tabs for single vs bulk upload */}
+          <div className="mb-6 border-b border-slate-200">
+            <ul className="flex flex-wrap -mb-px text-sm font-medium text-center" role="tablist">
+              <li className="mr-2" role="presentation">
+                <button
+                  className={`inline-block p-4 border-b-2 rounded-t-lg ${activeTab === 'single' ? 'border-indigo-600 text-indigo-600' : 'border-transparent hover:text-indigo-600 hover:border-indigo-600'}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'single'}
+                  onClick={() => setActiveTab('single')}
+                >
+                  One Product Only
+                </button>
+              </li>
+              <li className="mr-2" role="presentation">
+                <button
+                  className={`inline-block p-4 border-b-2 rounded-t-lg ${activeTab === 'bulk' ? 'border-indigo-600 text-indigo-600' : 'border-transparent hover:text-indigo-600 hover:border-indigo-600'}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'bulk'}
+                  onClick={() => setActiveTab('bulk')}
+                >
+                  Add Multiple Products (CSV)
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          {/* Single Product Form */}
+          <div id="single-product" role="tabpanel" className={activeTab === 'single' ? '' : 'hidden'}>
+            <form onSubmit={handleAddProduct} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="product_name_manage" className="block text-sm font-medium text-slate-700 mb-1">
+                    Product Name
+                  </label>
+                  <select
+                    name="product_name"
+                    id="product_name_manage"
+                    value={productForm.product_name}
+                    onChange={handleProductFormChange}
+                    required
+                    className="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                   >
-                    <X size={18} />
-                  </button>
+                    <option value="" disabled>Select a product</option>
+                    <option value="aiDAPTIV+">aiDAPTIV+</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="serial_number_manage" className="block text-sm font-medium text-slate-700 mb-1">Serial Number</label>
+                  <input type="text" name="serial_number" id="serial_number_manage" value={productForm.serial_number} onChange={handleProductFormChange} placeholder="e.g.,SN123" className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+              </div>
+
+              <div>
+                <button type="submit" disabled={isAddingProduct} className="w-full sm:w-auto flex justify-center items-center py-2.5 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60">
+                  {isAddingProduct ? 'Adding...' : 'Add Product'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* CSV Upload Form */}
+          <div id="csv-upload" role="tabpanel" className={activeTab === 'bulk' ? '' : 'hidden'}>
+            <form onSubmit={handleCsvUpload} className="space-y-4">
+              <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  <FileUp size={42} className="text-slate-400" />
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-medium text-slate-700">Upload CSV File</h3>
+                    <p className="text-sm text-slate-500">
+                      Upload a CSV file with columns: product_name, serial_number
+                    </p>
+                    <p className="text-xs text-indigo-600 hover:underline cursor-pointer" onClick={downloadSampleCsv}>
+                      Download sample template
+                    </p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    ref={fileInputRef}
+                    onChange={handleCsvFileChange}
+                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                  />
+                </div>
+                {csvFile && (
+                  <div className="mt-4 p-3 bg-indigo-50 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center">
+                      <FileText className="text-indigo-600 mr-2" size={18} />
+                      <span className="text-sm font-medium text-slate-700 truncate max-w-xs">
+                        {csvFile.name}
+                      </span>
+                      <span className="text-xs text-slate-500 ml-2">
+                        ({(csvFile.size / 1024).toFixed(2)} KB)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={resetFileInput}
+                      className="text-slate-500 hover:text-red-600"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {uploadProgress > 0 && (
+                <div className="w-full bg-slate-200 rounded-full h-2.5 mb-4">
+                  <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
                 </div>
               )}
-            </div>
 
-            {uploadProgress > 0 && (
-              <div className="w-full bg-slate-200 rounded-full h-2.5 mb-4">
-                <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-slate-500">
+                  Make sure your CSV has the correct format with required fields.
+                </p>
+                <button
+                  type="submit"
+                  disabled={isProcessingCsv || !csvFile}
+                  className="flex justify-center items-center py-2.5 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60"
+                >
+                  {isProcessingCsv ? (
+                    <>
+                      <Loader className="animate-spin mr-2" size={16} />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="mr-2" size={16} />
+                      Upload & Process
+                    </>
+                  )}
+                </button>
               </div>
-            )}
+            </form>
+          </div>
+        </div>
 
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-slate-500">
-                Make sure your CSV has the correct format with required fields.
-              </p>
-              <button
-                type="submit"
-                disabled={isProcessingCsv || !csvFile}
-                className="flex justify-center items-center py-2.5 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60"
-              >
-                {isProcessingCsv ? (
-                  <>
-                    <Loader className="animate-spin mr-2" size={16} />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <UploadCloud className="mr-2" size={16} />
-                    Upload & Process
-                  </>
-                )}
-              </button>
+        {/* View All Products Table */}
+        <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
+            <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+              <input
+                type="text"
+                placeholder="Search by serial number..."
+                value={productSearchTerm}
+                onChange={(e) => setProductSearchTerm(e.target.value)}
+                className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             </div>
-          </form>
-        </div>
-      </div>
-
-      {/* View All Products Table */}
-      <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
-          <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-            <input
-              type="text"
-              placeholder="Search by serial number..."
-              value={productSearchTerm}
-              onChange={(e) => setProductSearchTerm(e.target.value)}
-              className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+            <p className="text-slate-600 text-sm whitespace-nowrap">
+              Showing <span className="font-semibold text-indigo-600">{filteredSystemProducts.length}</span> of <span className="font-semibold text-indigo-600">{allProducts.length}</span> registrations
+            </p>
           </div>
-          <p className="text-slate-600 text-sm whitespace-nowrap">
-            Showing <span className="font-semibold text-indigo-600">{filteredSystemProducts.length}</span> of <span className="font-semibold text-indigo-600">{allProducts.length}</span> registrations
-          </p>
-        </div>
-        <h2 className="text-2xl font-semibold mb-1 text-slate-800 flex items-center">
-          <Package className="mr-3 text-indigo-600" size={28} /> Existing Products
-        </h2>
-        <p className="text-sm text-slate-500 mb-6">View and manage all products available in the system.</p>
+          <h2 className="text-2xl font-semibold mb-1 text-slate-800 flex items-center">
+            <Package className="mr-3 text-indigo-600" size={28} /> Existing Products
+          </h2>
+          <p className="text-sm text-slate-500 mb-6">View and manage all products available in the system.</p>
 
-        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="relative flex items-center w-full md:w-auto">
+          <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="relative flex items-center w-full md:w-auto">
 
+            </div>
+
+            {/* Show group delete button when items are selected */}
+            {selectedProductIds.length > 0 && (
+              <button
+                onClick={handleGroupDelete}
+                disabled={isSubmitting}
+                className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center text-sm disabled:opacity-50"
+              >
+                <Trash2 size={16} className="mr-2" /> Delete Selected ({selectedProductIds.length})
+              </button>
+            )}
           </div>
 
-          {/* Show group delete button when items are selected */}
-          {selectedProductIds.length > 0 && (
-            <button
-              onClick={handleGroupDelete}
-              disabled={isSubmitting}
-              className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center text-sm disabled:opacity-50"
-            >
-              <Trash2 size={16} className="mr-2" /> Delete Selected ({selectedProductIds.length})
-            </button>
-          )}
-        </div>
-
-        {filteredSystemProducts.length === 0 ? (
-          <div className="text-center py-10 text-slate-500">
-            {productSearchTerm ? `No products found for "${productSearchTerm}".` : "No products added to the system yet."}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px] divide-y divide-slate-200">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th scope="col" className="px-2 py-3 text-center">
-                    <input
-                      type="checkbox"
-                      className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedProductIds(filteredSystemProducts.map(p => p.serial_number));
-                        } else {
-                          setSelectedProductIds([]);
-                        }
-                      }}
-                      checked={selectedProductIds.length > 0 && selectedProductIds.length === filteredSystemProducts.length}
-                      title="Select all visible"
-                    />
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Name</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered Status</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
-                {filteredSystemProducts.map((product) => (
-                  <tr key={product.id || product.product_name} className={`${selectedProductIds.includes(product.serial_number) ? 'bg-indigo-50' : 'hover:bg-slate-50'} transition-colors`}>
-                    <td className="px-2 py-4 text-center">
+          {filteredSystemProducts.length === 0 ? (
+            <div className="text-center py-10 text-slate-500">
+              {productSearchTerm ? `No products found for "${productSearchTerm}".` : "No products added to the system yet."}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th scope="col" className="px-2 py-3 text-center">
                       <input
                         type="checkbox"
                         className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
-                        checked={selectedProductIds.includes(product.serial_number)}
-                        onChange={() => toggleSelectProduct(product.serial_number)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedProductIds(filteredSystemProducts.map(p => p.serial_number));
+                          } else {
+                            setSelectedProductIds([]);
+                          }
+                        }}
+                        checked={selectedProductIds.length > 0 && selectedProductIds.length === filteredSystemProducts.length}
+                        title="Select all visible"
                       />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{product.product_name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.serial_number}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.registered_status}</td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-2">
-                      <button
-                        onClick={() => handleDeleteProduct(product.serial_number)}
-                        title="Delete Product"
-                        className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
-                        disabled={isSubmitting}
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Name</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered Status</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-200">
+                  {filteredSystemProducts.map((product) => (
+                    <tr key={product.id || product.product_name} className={`${selectedProductIds.includes(product.serial_number) ? 'bg-indigo-50' : 'hover:bg-slate-50'} transition-colors`}>
+                      <td className="px-2 py-4 text-center">
+                        <input
+                          type="checkbox"
+                          className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
+                          checked={selectedProductIds.includes(product.serial_number)}
+                          onChange={() => toggleSelectProduct(product.serial_number)}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{product.product_name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.serial_number}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.registered_status}</td>
+
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-2">
+                        <button
+                          onClick={() => handleDeleteProduct(product.serial_number)}
+                          title="Delete Product"
+                          className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
+                          disabled={isSubmitting}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
   // --- Main Component Render ---
   return (
     <div className="flex min-h-screen bg-slate-100">
       <Sidebar />
-      <div 
-        className={`flex-grow flex flex-col transition-all duration-300
+      <div
+        className={`flex-grow flex flex-col transition-all duration-300 min-w-0
                   ${(isSidebarOpen && windowWidth >= 1024) ? "lg:pl-64" : (windowWidth >= 1024 ? "lg:pl-20" : "pl-0")}`}
       >
         <TopBar />
@@ -1772,104 +2017,163 @@ const ManageProductsView = () => {
                   {registrations.length > 0 && <UserInfoCard userInfoFromReg={registrations[0]} userFromContext={user} userEmail={userEmail} />}
                   <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
                     <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
-                        <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={18}/>
-                            <input
-                                type="text" placeholder="Search by serial number..."
-                                className="w-full md:w-80 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow text-sm"
-                                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                        <p className="text-slate-600 text-sm whitespace-nowrap">
-                            Showing <span className="font-semibold text-indigo-600">{filteredItems.length}</span> of <span className="font-semibold text-indigo-600">{registrations.length}</span> registrations
-                        </p>
+                      <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                        <input
+                          type="text" placeholder="Search by serial number..."
+                          className="w-full md:w-80 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow text-sm"
+                          value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+                      <p className="text-slate-600 text-sm whitespace-nowrap">
+                        Showing <span className="font-semibold text-indigo-600">{filteredItems.length}</span> of <span className="font-semibold text-indigo-600">{registrations.length}</span> registrations
+                      </p>
                     </div>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-6 border-b border-slate-200">
-                        <div>
-                            <h2 className="text-2xl font-semibold text-slate-800">My Registered Products</h2>
-                            <p className="text-sm text-slate-500 mt-1">Manage your product registrations and their warranty status.</p>
-                        </div>
+                      <div>
+                        <h2 className="text-2xl font-semibold text-slate-800">My Registered Products</h2>
+                        <p className="text-sm text-slate-500 mt-1">Manage your product registrations and their warranty status.</p>
+                      </div>
                     </div>
                     {registrations.length === 0 ? (
-                        <div className="text-center py-12">
-                            <Package className="mx-auto mb-6 text-slate-400" size={64} />
-                            <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Registrations Yet</h2>
-                            <p className="text-slate-500 max-w-md mx-auto">No product registrations found for <span className="font-medium">{userEmail}</span>.</p>
-                        </div>
+                      <div className="text-center py-12">
+                        <Package className="mx-auto mb-6 text-slate-400" size={64} />
+                        <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Registrations Yet</h2>
+                        <p className="text-slate-500 max-w-md mx-auto">No product registrations found for <span className="font-medium">{userEmail}</span>.</p>
+                      </div>
                     ) : filteredItems.length === 0 && searchTerm ? (
-                         <div className="text-center py-12">
-                            <Search className="mx-auto mb-6 text-slate-400" size={64} />
-                            <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Matching Registrations</h2>
-                            <p className="text-slate-500 mb-6 max-w-md mx-auto">Your search for "{searchTerm}" did not match any registrations.</p>
-                            <button className="px-6 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium" onClick={() => setSearchTerm("")}> Clear Search </button>
-                        </div>
+                      <div className="text-center py-12">
+                        <Search className="mx-auto mb-6 text-slate-400" size={64} />
+                        <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Matching Registrations</h2>
+                        <p className="text-slate-500 mb-6 max-w-md mx-auto">Your search for "{searchTerm}" did not match any registrations.</p>
+                        <button className="px-6 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium" onClick={() => setSearchTerm("")}> Clear Search </button>
+                      </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[860px] divide-y divide-slate-200">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Details</th>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered On</th>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Warranty Status</th>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-slate-200">
-                                    {filteredItems.map((reg, index) => (
-                                    <tr key={index} className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center">
-                                                <div className="flex-shrink-0 h-12 w-12 flex items-center justify-center bg-indigo-100 rounded-lg mr-4 group-hover:bg-indigo-200 transition-colors">
-                                                    <Package className="text-indigo-600" size={24} />
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm font-semibold text-slate-900">{reg.product_name || "N/A"}</div>
-                                                    <div className="text-xs text-slate-500">{reg.product_category || "General"}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center text-sm text-slate-700">
-                                                <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
-                                                {reg.serial_number || "N/A"}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center text-sm text-slate-700">
-                                                <Calendar className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
-                                                {formatDate(reg.registered_at)}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm"> {/* Copied from original with minor style adjustments */}
-                                            {(() => {
-                                                const status = reg.warrantyStatus; const hasRecord = reg.hasWarrantyRecord;
-                                                if (hasRecord === false) { return (<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-300" title="No warranty claim initiated for this product."><Info size={14} className="mr-1 text-slate-500" /> Not Claimed</span>); }
-                                                else if (hasRecord === true) {
-                                                    let badgeClass = "bg-sky-100 text-sky-700 border-sky-300"; let icon = <ShieldCheck size={14} className="mr-1 text-sky-600" />; let displayStatus = typeof status === 'string' ? status : "Claimed";
-                                                    if (typeof status === 'string') { const lowerStatus = status.toLowerCase(); if (lowerStatus.includes("pending")) { badgeClass = "bg-yellow-100 text-yellow-700 border-yellow-300"; icon = <Info size={14} className="mr-1 text-yellow-600" />; } else if (lowerStatus.includes("approved")) { badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-300"; icon = <ShieldCheck size={14} className="mr-1 text-emerald-600" />; } else if (lowerStatus.includes("rejected")) { badgeClass = "bg-red-100 text-red-700 border-red-300"; icon = <AlertTriangle size={14} className="mr-1 text-red-600" />; }}
-                                                    return (<span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeClass}`} title={`Warranty Status: ${displayStatus}`}>{icon} {displayStatus}</span> );
-                                                } else {
-                                                    let titleText = "Could not retrieve warranty status."; let displayText = "Unavailable"; if (status === "N/A (No S/N)") { titleText = "Warranty status check N/A: Serial number missing for this registration."; displayText = "N/A (No S/N)"; } else if (status === "Status Unavailable") { titleText = "Warranty status is temporarily unavailable for this product."; } else if (status === "Error Fetching Status") { titleText = "An error occurred while fetching warranty status for this product."; }
-                                                    return (<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-300" title={titleText}><AlertTriangle size={14} className="mr-1 text-orange-500" /> {displayText}</span>);
-                                                }
-                                            })()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap ">
-                                            <div className="flex items-center space-x-3">
-                                                <button onClick={() => downloadInvoice(reg.product_name, reg.serial_number)} disabled={!reg.invoice_receipt} className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs" title={!reg.invoice_receipt ? "Invoice not available" : "Download Invoice"}>
-                                                    <Download className="mr-1.5" size={14} /> Invoice
-                                                </button>
-                                                <button onClick={() => handleClaimClick(reg)} className="inline-flex items-center px-3 py-1.5 border border-transparent rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors text-xs" title="File or view warranty claim">
-                                                    <ShieldCheck className="mr-1.5" size={14} /> Claim
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[860px] divide-y divide-slate-200">
+                          <thead className="bg-slate-50">
+                            <tr>
+                              <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Details</th>
+                              <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
+                              <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered On</th>
+                              <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Warranty Status</th>
+                              <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-slate-200">
+                            {filteredItems.map((reg, index) => {
+                              // Determine if the claim is approved
+                              const isApproved = reg.warrantyStatus?.toLowerCase().includes('approved');
+                              const isPending = reg.warrantyStatus?.toLowerCase().includes('pending');
+                              const isRejected = reg.warrantyStatus?.toLowerCase().includes('rejected');
+
+                              // Determine if any claim exists (approved, pending, rejected)
+                              const claimExists = reg.hasWarrantyRecord === true;
+                              // Determine if the status means no claim has been made yet
+                              const notYetClaimed = reg.hasWarrantyRecord === false || reg.warrantyStatus === "Not Claimed";
+
+                              let claimButtonText = "Claim Warranty";
+                              let claimButtonTitle = "File a new warranty claim";
+                              let claimButtonAction = () => handleClaimClick(reg);
+                              let claimButtonDisabled = false;
+                              let claimButtonClasses = "bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500";
+
+                              if (isApproved) {
+                                claimButtonText = "Approved";
+                                claimButtonTitle = "Warranty claim has been approved";
+                                claimButtonAction = () => { /* No action or view details */ }; // Or navigate to a read-only view if you have one
+                                claimButtonDisabled = true;
+                                claimButtonClasses = "bg-green-500 cursor-not-allowed"; // Green for approved, but disabled
+                              } else if (claimExists) { // Claim exists but is not approved (e.g., Pending, Rejected)
+                                claimButtonText = "Claimed";
+                                // handleClaimClick likely takes user to a form where they can see details
+                                claimButtonDisabled = true;
+                                if (isPending) {
+                                  claimButtonTitle = `Warranty Claim Status: Pending`;
+                                  claimButtonClasses = "bg-yellow-200 text-orange-900 border-yellow-400"; // Yellow for pending
+                                } else if (isRejected) {
+                                  // Fallback for other existing claim statuses that aren't approved, pending, or rejected
+                                  claimButtonTitle = `Warranty Claim Status: Rejected`;
+                                  claimButtonClasses = "bg-red-500 text-white-900 border-red-400";
+                                }
+                              }
+                              // If notYetClaimed, default values for text, title, action, and enabled state are used.
+
+                              return (
+                                <tr key={index} className="hover:bg-slate-50 transition-colors group">
+                                  {/* Product Details Cell - Assumed to be similar to your existing code */}
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="flex items-center">
+                                      <div className="flex-shrink-0 h-12 w-12 flex items-center justify-center bg-indigo-100 rounded-lg mr-4 group-hover:bg-indigo-200 transition-colors">
+                                        <Package className="text-indigo-600" size={24} />
+                                      </div>
+                                      <div>
+                                        <div className="text-sm font-semibold text-slate-900">{reg.product_name || "N/A"}</div>
+                                        <div className="text-xs text-slate-500">{reg.product_category || "General"}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Serial Number Cell */}
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="flex items-center text-sm text-slate-700">
+                                      <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
+                                      {reg.serial_number || "N/A"}
+                                    </div>
+                                  </td>
+
+                                  {/* Registered On Cell */}
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="flex items-center text-sm text-slate-700">
+                                      <Calendar className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
+                                      {formatDate(reg.registered_at)}
+                                    </div>
+                                  </td>
+
+                                  {/* Warranty Status Cell (Your existing complex badge logic) */}
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    {(() => {
+                                      const status = reg.warrantyStatus; const hasRecord = reg.hasWarrantyRecord;
+                                      if (hasRecord === false) { return (<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-300" title="No warranty claim initiated for this product."><Info size={14} className="mr-1 text-slate-500" /> Not Claimed</span>); }
+                                      else if (hasRecord === true) {
+                                        let badgeClass = "bg-sky-100 text-sky-700 border-sky-300"; let icon = <ShieldCheck size={14} className="mr-1 text-sky-600" />; let displayStatus = typeof status === 'string' ? status : "Claimed";
+                                        if (typeof status === 'string') { const lowerStatus = status.toLowerCase(); if (lowerStatus.includes("pending")) { badgeClass = "bg-yellow-100 text-yellow-700 border-yellow-300"; icon = <Info size={14} className="mr-1 text-yellow-600" />; } else if (lowerStatus.includes("approved")) { badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-300"; icon = <ShieldCheck size={14} className="mr-1 text-emerald-600" />; } else if (lowerStatus.includes("rejected")) { badgeClass = "bg-red-100 text-red-700 border-red-300"; icon = <AlertTriangle size={14} className="mr-1 text-red-600" />; } }
+                                        return (<span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeClass}`} title={`Warranty Status: ${displayStatus}`}>{icon} {displayStatus}</span>);
+                                      } else {
+                                        let titleText = "Could not retrieve warranty status."; let displayText = "Unavailable"; if (status === "N/A (No S/N)") { titleText = "Warranty status check N/A: Serial number missing for this registration."; displayText = "N/A (No S/N)"; } else if (status === "Status Unavailable") { titleText = "Warranty status is temporarily unavailable for this product."; } else if (status === "Error Fetching Status") { titleText = "An error occurred while fetching warranty status for this product."; }
+                                        return (<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-300" title={titleText}><AlertTriangle size={14} className="mr-1 text-orange-500" /> {displayText}</span>);
+                                      }
+                                    })()}
+                                  </td>
+
+                                  {/* Actions Cell - Modified Claim Button */}
+                                  <td className="px-6 py-4 whitespace-nowrap ">
+                                    <div className="flex items-center space-x-3">
+                                      <button
+                                        onClick={() => downloadInvoice(reg.id, reg.product_name, reg.serial_number)}
+                                        disabled={!reg.invoice_receipt}
+                                        className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs"
+                                        title={!reg.invoice_receipt ? "Invoice not available" : "Download Invoice"}
+                                      >
+                                        <Download className="mr-1.5" size={14} /> Invoice
+                                      </button>
+
+                                      <button
+                                        onClick={claimButtonAction}
+                                        className={`inline-flex items-center px-3 py-1.5 border border-transparent rounded-lg shadow-sm text-white text-xs transition-colors ${claimButtonClasses} ${claimButtonDisabled ? 'disabled:opacity-70' : ''}`}
+                                        title={claimButtonTitle}
+                                        disabled={claimButtonDisabled}
+                                      >
+                                        <ShieldCheck className="mr-1.5" size={14} /> {claimButtonText}
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </div>
                 </>
@@ -1883,7 +2187,7 @@ const ManageProductsView = () => {
               {console.log(warrantyReports)}
               {isAdmin && currentPage === "warrantyReports" && <WarrantyReportsView />}
               {isAdmin && currentPage === "manageProducts" && <ManageProductsView />}
-              
+
               {/* ---- COMMON VIEWS (Settings) ---- */}
               {currentPage === "settings" && <SettingsSection />}
             </>
