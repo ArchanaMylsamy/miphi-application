@@ -860,7 +860,13 @@ export default function ProductRegistrationsCRM() {
                   <tr key={index} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{reg.name || 'N/A'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{reg.email || 'N/A'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{reg.mobile_number || 'N/A'}</td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">
+                        {
+                          (reg.country_code && reg.mobile_number) // Check if both exist
+                            ? `${reg.country_code} ${reg.mobile_number}` // Display with a space
+                            : (reg.country_code || '') + (reg.mobile_number || '') || 'N/A' // Fallback: display whichever part exists, or N/A
+                        }
+                      </td>
   
                       <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center text-sm text-slate-700">
