@@ -1,7 +1,7 @@
-import { useState, useEffect, useContext, useCallback, useRef ,useMemo} from "react";
+import { useState, useEffect, useContext, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, FileText, Download, Calendar, Package, Tag, User, Mail, Phone, FileUp, Loader, UploadCloud,ChevronLeft,ChevronRight,
+  Search, FileText, Download, Calendar, Package, Tag, User, Mail, Phone, FileUp, Loader, UploadCloud, ChevronLeft, ChevronRight,
   Settings, LogOut, ChevronDown, Bell, Menu, X, ShieldCheck, Key, Info, BookOpenCheck, BookText,
   AlertTriangle, ListChecks, PlusCircle, Edit3, Trash2, CheckSquare, Send // Added icons for admin
 } from "lucide-react";
@@ -108,7 +108,7 @@ export default function ProductRegistrationsCRM() {
       if (fetchedItems.length > 0) {
         if (isAdmin) {
           // ADMIN PATH: No warranty check, use the fetched data directly.
-          console.log("Fetched all registrations for admin:", fetchedItems);
+          // console.log("Fetched all registrations for admin:", fetchedItems);
           setAllRegistrations(fetchedItems);
         } else {
           // USER PATH: Perform warranty check for each registration.
@@ -135,11 +135,14 @@ export default function ProductRegistrationsCRM() {
                 );
                 if (warrantyResponse.ok) {
                   const warrantyData = await warrantyResponse.json();
+
                   // Added a check for warrantyData itself for robustness
-                  if (warrantyData && warrantyData.length > 0) {
-                    const statusMessage = warrantyData[0]?.claim_status;
+                  if (warrantyData) {
+                    // console.log("Warranty Response : ", warrantyData);
+                    const statusMessage = warrantyData?.registered_for_claim == 'no' ? 'Not Claimed' : warrantyData?.claim_status;
                     return { ...reg, warrantyStatus: statusMessage, warrantyRecord: warrantyData[0], hasWarrantyRecord: true };
                   } else {
+
                     return { ...reg, warrantyStatus: "Not Claimed", hasWarrantyRecord: false };
                   }
                 } else if (warrantyResponse.status === 404) {
@@ -217,12 +220,14 @@ export default function ProductRegistrationsCRM() {
   const fetchAllProducts = useCallback(async () => {
     if (!isAdmin || currentPage !== 'manageProducts') return; // Only for admin on manageProducts page
     setLoading(true);
+
     try {
       const token = sessionStorage.getItem('token');
       if (!token) {
         setError("No token found. Please log in again.");
         return;
       }
+
       const response = await fetch(`https://miphi-blog-backend.vercel.app/shipped_products/`, {
         method: 'GET',
         headers: {
@@ -230,19 +235,30 @@ export default function ProductRegistrationsCRM() {
           'Authorization': `Bearer ${token}`,
         }
       });
+
+      if (response.status === 404) {
+        setAllProducts([]);
+        setError("No products found.");
+        return;
+      }
+
       if (!response.ok) throw new Error(`API error: ${response.status}`);
+
       const data = await response.json();
-      console.log("Fetched all products:", data.registrations);
-      setAllProducts(data.registrations || []); // Adjust based on API response
+      // console.log("Fetched all products:", data.registrations);
+
+      setAllProducts(data.registrations || []);
       setError(null);
+
     } catch (err) {
       console.error("Error fetching products:", err);
-      setError(err.message);
       setAllProducts([]);
+      setError("Failed to fetch products. Please try again later.");
     } finally {
       setLoading(false);
     }
   }, [isAdmin, currentPage]);
+
 
   useEffect(() => {
     if (isAdmin) {
@@ -302,7 +318,7 @@ export default function ProductRegistrationsCRM() {
   // --- Download Invoice Action --- ( 그대로 사용 )
   const downloadInvoice = async (id, productName, serialNumber) => {
     try {
-      console.log(`Downloading invoice for: ${productName} (S/N: ${serialNumber})`);
+      // console.log(`Downloading invoice for: ${productName} (S/N: ${serialNumber})`);
       const token = sessionStorage.getItem('token');
       if (!token) {
         setError("No token found. Please log in again.");
@@ -861,234 +877,193 @@ export default function ProductRegistrationsCRM() {
   };
 
   // --- ADMIN: All Registrations View Component (Placeholder) ---
- const AllRegistrationsView = () => {
-  const [viewSearchTerm, setViewSearchTerm] = useState(''); // Local search term for this view
-  const [currentPageForTable, setCurrentPageForTable] = useState(1); // Page state for this table
-  const [itemsPerPage] = useState(10); // Show 10 items per page
+  const AllRegistrationsView = () => {
+    const [viewSearchTerm, setViewSearchTerm] = useState(''); // Local search term for this view
+    const [currentPageForTable, setCurrentPageForTable] = useState(1); // Page state for this table
+    const [itemsPerPage] = useState(10); // Show 10 items per page
 
-  // Reset to page 1 whenever the search term changes or the underlying allRegistrations data changes
-  useEffect(() => {
-    setCurrentPageForTable(1);
-  }, [viewSearchTerm, allRegistrations]); // allRegistrations is from the parent scope
+    // Reset to page 1 whenever the search term changes or the underlying allRegistrations data changes
+    useEffect(() => {
+      setCurrentPageForTable(1);
+    }, [viewSearchTerm, allRegistrations]); // allRegistrations is from the parent scope
 
-  // Filter items based on serial number, user name, or user email
-  const filteredItems = useMemo(() => {
-    if (!viewSearchTerm) return allRegistrations; // allRegistrations is from the parent component's state
-    const lowerSearchTerm = viewSearchTerm.toLowerCase();
-    return allRegistrations.filter(reg =>
-      (reg.name || '').toLowerCase().includes(lowerSearchTerm) ||
-      (reg.email || '').toLowerCase().includes(lowerSearchTerm) ||
-      (reg.product_name || '').toLowerCase().includes(lowerSearchTerm) ||
-      (reg.serial_number || '').toLowerCase().includes(lowerSearchTerm)
-    );
-  }, [allRegistrations, viewSearchTerm]);
+    // Filter items based on serial number, user name, or user email
+    const filteredItems = useMemo(() => {
+      if (!viewSearchTerm) return allRegistrations; // allRegistrations is from the parent component's state
+      const lowerSearchTerm = viewSearchTerm.toLowerCase();
+      return allRegistrations.filter(reg =>
+        (reg.name || '').toLowerCase().includes(lowerSearchTerm) ||
+        (reg.email || '').toLowerCase().includes(lowerSearchTerm) ||
+        (reg.product_name || '').toLowerCase().includes(lowerSearchTerm) ||
+        (reg.serial_number || '').toLowerCase().includes(lowerSearchTerm)
+      );
+    }, [allRegistrations, viewSearchTerm]);
 
-  // Pagination Logic
-  const indexOfLastItem = currentPageForTable * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItemsToDisplay = filteredItems.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+    // Pagination Logic
+    const indexOfLastItem = currentPageForTable * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItemsToDisplay = filteredItems.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
 
-  const handlePaginate = (pageNumber) => {
-    if (pageNumber >= 1 && pageNumber <= totalPages) {
-      setCurrentPageForTable(pageNumber);
-    }
-  };
+    const handlePaginate = (pageNumber) => {
+      if (pageNumber >= 1 && pageNumber <= totalPages) {
+        setCurrentPageForTable(pageNumber);
+      }
+    };
 
-  return (
-    <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
-        <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={18}/>
-          <input
-            type="text"
-            placeholder="Search by name, email, product, S/N..."
-            className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow text-sm"
-            value={viewSearchTerm}
-            onChange={(e) => setViewSearchTerm(e.target.value)}
-          />
-        </div>
-        <p className="text-slate-600 text-sm whitespace-nowrap">
-          Showing <span className="font-semibold text-indigo-600">{currentItemsToDisplay.length}</span> of <span className="font-semibold text-indigo-600">{filteredItems.length}</span> results ({allRegistrations.length} total)
-        </p>
-      </div>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-6 border-b border-slate-200">
-        <div>
-          <h2 className="text-2xl font-semibold text-slate-800">All User Registrations</h2>
-          <p className="text-sm text-slate-500 mt-1">View and manage all product registrations across users.</p>
-        </div>
-      </div>
-
-      {allRegistrations.length === 0 && !viewSearchTerm ? (
-        <div className="text-center py-12">
-          <Package className="mx-auto mb-6 text-slate-400" size={64} />
-          <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Registrations Found</h2>
-          <p className="text-slate-500 max-w-md mx-auto">There are currently no product registrations in the system.</p>
-        </div>
-      ) : currentItemsToDisplay.length === 0 && viewSearchTerm ? (
-        <div className="text-center py-12">
-          <Search className="mx-auto mb-6 text-slate-400" size={64} />
-          <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Matching Registrations</h2>
-          <p className="text-slate-500 mb-6 max-w-md mx-auto">Your search for "{viewSearchTerm}" did not match any registrations.</p>
-          <button
-            className="px-6 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium transition-colors focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
-            onClick={() => setViewSearchTerm("")} // Clears the local search term
-          > Clear Search </button>
-        </div>
-      ) : (
-        <>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] divide-y divide-slate-200">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">User Name</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">User Email</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Mobile</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Details</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered On</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Invoice PDF</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
-                {currentItemsToDisplay.map((reg, index) => ( // Iterate over currentItemsToDisplay
-                  <tr key={reg.id || `${reg.serial_number}-${index}`} className="hover:bg-slate-50 transition-colors group"> {/* Ensure unique key */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{reg.name || 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{reg.email || 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">
-                      {
-                        (reg.country_code && reg.mobile_number)
-                          ? `${reg.country_code} ${reg.mobile_number}`
-                          : (reg.country_code || '') + (reg.mobile_number || '') || 'N/A'
-                      }
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-slate-700">
-                        <Package className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={24} />
-                        {reg.product_name || "General"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-slate-700">
-                        <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
-                        {reg.serial_number || "N/A"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-slate-700">
-                        <Calendar className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
-                        {formatDate(reg.registered_at)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap ">
-                      <div className="flex items-center ">
-                        <button onClick={() => downloadInvoice(reg.id, reg.product_name, reg.serial_number)} disabled={!reg.invoice_receipt} className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs" title={!reg.invoice_receipt ? "Invoice not available" : "Download Invoice"}>
-                          <Download className="mr-1.5" size={14} /> Invoice
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
+          <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+            <input
+              type="text"
+              placeholder="Search by name, email, product, S/N..."
+              className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow text-sm"
+              value={viewSearchTerm}
+              onChange={(e) => setViewSearchTerm(e.target.value)}
+            />
           </div>
+          <p className="text-slate-600 text-sm whitespace-nowrap">
+            Showing <span className="font-semibold text-indigo-600">{currentItemsToDisplay.length}</span> of <span className="font-semibold text-indigo-600">{filteredItems.length}</span> results ({allRegistrations.length} total)
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-6 border-b border-slate-200">
+          <div>
+            <h2 className="text-2xl font-semibold text-slate-800">All User Registrations</h2>
+            <p className="text-sm text-slate-500 mt-1">View and manage all product registrations across users.</p>
+          </div>
+        </div>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <nav className="mt-6 flex flex-col items-center space-y-2 sm:flex-row sm:justify-between" aria-label="Table navigation">
-              <span className="text-sm font-normal text-slate-500">
-                Page <span className="font-semibold text-slate-900">{currentPageForTable}</span> of <span className="font-semibold text-slate-900">{totalPages}</span>
-              </span>
-              <ul className="inline-flex items-center -space-x-px">
-                <li>
-                  <button
-                    onClick={() => handlePaginate(currentPageForTable - 1)}
-                    disabled={currentPageForTable === 1}
-                    className="py-2 px-3 ml-0 leading-tight text-slate-500 bg-white rounded-l-lg border border-slate-300 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                </li>
-                {/* Optional: Page Number Buttons - keeping it simple for now */}
-                {/* Example: Array.from({ length: totalPages }, (_, i) => i + 1).map(page => ...) */}
-                <li>
-                  <button
-                    onClick={() => handlePaginate(currentPageForTable + 1)}
-                    disabled={currentPageForTable === totalPages}
-                    className="py-2 px-3 leading-tight text-slate-500 bg-white rounded-r-lg border border-slate-300 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </li>
-              </ul>
-            </nav>
-          )}
-        </>
-      )}
-    </div>
-  );
-};
-  // --- ADMIN: Warranty Reports View Component (Placeholder) ---
- const WarrantyReportsView = () => {
-  const [selectedReportIds, setSelectedReportIds] = useState([]);
-  const [groupUpdateStatus, setGroupUpdateStatus] = useState('');
-  const [reportSearchTerm, setReportSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+        {allRegistrations.length === 0 && !viewSearchTerm ? (
+          <div className="text-center py-12">
+            <Package className="mx-auto mb-6 text-slate-400" size={64} />
+            <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Registrations Found</h2>
+            <p className="text-slate-500 max-w-md mx-auto">There are currently no product registrations in the system.</p>
+          </div>
+        ) : currentItemsToDisplay.length === 0 && viewSearchTerm ? (
+          <div className="text-center py-12">
+            <Search className="mx-auto mb-6 text-slate-400" size={64} />
+            <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Matching Registrations</h2>
+            <p className="text-slate-500 mb-6 max-w-md mx-auto">Your search for "{viewSearchTerm}" did not match any registrations.</p>
+            <button
+              className="px-6 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium transition-colors focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+              onClick={() => setViewSearchTerm("")} // Clears the local search term
+            > Clear Search </button>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1000px] divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">User Name</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">User Email</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Mobile</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Details</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered On</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Invoice PDF</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-200">
+                  {currentItemsToDisplay.map((reg, index) => ( // Iterate over currentItemsToDisplay
+                    <tr key={reg.id || `${reg.serial_number}-${index}`} className="hover:bg-slate-50 transition-colors group"> {/* Ensure unique key */}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{reg.name || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{reg.email || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">
+                        {
+                          (reg.country_code && reg.mobile_number)
+                            ? `${reg.country_code} ${reg.mobile_number}`
+                            : (reg.country_code || '') + (reg.mobile_number || '') || 'N/A'
+                        }
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-slate-700">
+                          <Package className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={24} />
+                          {reg.product_name || "General"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-slate-700">
+                          <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
+                          {reg.serial_number || "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-slate-700">
+                          <Calendar className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
+                          {formatDate(reg.registered_at)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap ">
+                        <div className="flex items-center ">
+                          <button onClick={() => downloadInvoice(reg.id, reg.product_name, reg.serial_number)} disabled={!reg.invoice_receipt} className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs" title={!reg.invoice_receipt ? "Invoice not available" : "Download Invoice"}>
+                            <Download className="mr-1.5" size={14} /> Invoice
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-  // Single warranty update function
-  const handleUpdateStatus = async (serialNumber, newStatus) => {
-    setIsSubmitting(true);
-    Swal.fire({ title: 'Updating Status...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    try {
-      const token = sessionStorage.getItem('token');
-      if (!token) {
-        setError("No token found. Please log in again.");
-        return;
-      }
-      // Updated to match your backend API
-      const response = await fetch(`https://miphi-blog-backend.vercel.app/warranty_status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          serial_number: serialNumber,
-          claim_status: newStatus
-        }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to update status.`);
-      }
-      Swal.fire('Success', 'Warranty status updated successfully!', 'success');
-      fetchWarrantyReports(); // Refresh the list
-    } catch (error) {
-      console.error("Error updating warranty status:", error);
-      Swal.fire('Error', `Failed to update status: ${error.message}`, 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <nav className="mt-6 flex flex-col items-center space-y-2 sm:flex-row sm:justify-between" aria-label="Table navigation">
+                <span className="text-sm font-normal text-slate-500">
+                  Page <span className="font-semibold text-slate-900">{currentPageForTable}</span> of <span className="font-semibold text-slate-900">{totalPages}</span>
+                </span>
+                <ul className="inline-flex items-center -space-x-px">
+                  <li>
+                    <button
+                      onClick={() => handlePaginate(currentPageForTable - 1)}
+                      disabled={currentPageForTable === 1}
+                      className="py-2 px-3 ml-0 leading-tight text-slate-500 bg-white rounded-l-lg border border-slate-300 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                  </li>
+                  {/* Optional: Page Number Buttons - keeping it simple for now */}
+                  {/* Example: Array.from({ length: totalPages }, (_, i) => i + 1).map(page => ...) */}
+                  <li>
+                    <button
+                      onClick={() => handlePaginate(currentPageForTable + 1)}
+                      disabled={currentPageForTable === totalPages}
+                      className="py-2 px-3 leading-tight text-slate-500 bg-white rounded-r-lg border border-slate-300 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </li>
+                </ul>
+              </nav>
+            )}
+          </>
+        )}
+      </div>
+    );
   };
+  // --- ADMIN: Warranty Reports View Component (Placeholder) ---
+  const WarrantyReportsView = () => {
+    const [selectedReportIds, setSelectedReportIds] = useState([]);
+    const [groupUpdateStatus, setGroupUpdateStatus] = useState('');
+    const [reportSearchTerm, setReportSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10);
 
-  // Group update function
-  const handleGroupUpdate = async () => {
-    if (selectedReportIds.length === 0 || !groupUpdateStatus) {
-      Swal.fire('Warning', 'Please select reports and a status for group update.', 'warning');
-      return;
-    }
-    setIsSubmitting(true);
-    Swal.fire({ title: 'Updating Selected Reports...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    try {
-      const token = sessionStorage.getItem('token');
-      if (!token) {
-        setError("No token found. Please log in again.");
-        return;
-      }
-      // Process each selected report individually since your backend doesn't support batch updates
-      const updatePromises = selectedReportIds.map(serialNumber =>
-        fetch(`https://miphi-blog-backend.vercel.app/warranty_status`, {
+    // Single warranty update function
+    const handleUpdateStatus = async (serialNumber, newStatus) => {
+      setIsSubmitting(true);
+      Swal.fire({ title: 'Updating Status...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+      try {
+        const token = sessionStorage.getItem('token');
+        if (!token) {
+          setError("No token found. Please log in again.");
+          return;
+        }
+        // Updated to match your backend API
+        const response = await fetch(`https://miphi-blog-backend.vercel.app/warranty_status`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1096,282 +1071,322 @@ export default function ProductRegistrationsCRM() {
           },
           body: JSON.stringify({
             serial_number: serialNumber,
-            claim_status: groupUpdateStatus
+            claim_status: newStatus
           }),
-        })
-      );
-
-      const results = await Promise.allSettled(updatePromises);
-      const failures = results.filter(r => r.status === 'rejected').length;
-
-      if (failures > 0) {
-        Swal.fire('Partial Success', `Updated ${results.length - failures} out of ${results.length} reports. ${failures} updates failed.`, 'warning');
-      } else {
-        Swal.fire('Success', 'Selected warranty statuses updated!', 'success');
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to update status.`);
+        }
+        Swal.fire('Success', 'Warranty status updated successfully!', 'success');
+        fetchWarrantyReports(); // Refresh the list
+      } catch (error) {
+        console.error("Error updating warranty status:", error);
+        Swal.fire('Error', `Failed to update status: ${error.message}`, 'error');
+      } finally {
+        setIsSubmitting(false);
       }
+    };
 
-      fetchWarrantyReports(); // Refresh
-      setSelectedReportIds([]);
-      setGroupUpdateStatus('');
-    } catch (error) {
-      console.error("Error in group update:", error);
-      Swal.fire('Error', `Group update failed: ${error.message}`, 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    // Group update function
+    const handleGroupUpdate = async () => {
+      if (selectedReportIds.length === 0 || !groupUpdateStatus) {
+        Swal.fire('Warning', 'Please select reports and a status for group update.', 'warning');
+        return;
+      }
+      setIsSubmitting(true);
+      Swal.fire({ title: 'Updating Selected Reports...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+      try {
+        const token = sessionStorage.getItem('token');
+        if (!token) {
+          setError("No token found. Please log in again.");
+          return;
+        }
+        // Process each selected report individually since your backend doesn't support batch updates
+        const updatePromises = selectedReportIds.map(serialNumber =>
+          fetch(`https://miphi-blog-backend.vercel.app/warranty_status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              serial_number: serialNumber,
+              claim_status: groupUpdateStatus
+            }),
+          })
+        );
 
-  const toggleSelectReport = (serialNumber) => {
-    setSelectedReportIds(prev =>
-      prev.includes(serialNumber) ? prev.filter(sn => sn !== serialNumber) : [...prev, serialNumber]
-    );
-  };
+        const results = await Promise.allSettled(updatePromises);
+        const failures = results.filter(r => r.status === 'rejected').length;
 
-  // Updated to filter only by serial number
-  const filteredReports = reportSearchTerm
-    ? warrantyReports.filter(report =>
+        if (failures > 0) {
+          Swal.fire('Partial Success', `Updated ${results.length - failures} out of ${results.length} reports. ${failures} updates failed.`, 'warning');
+        } else {
+          Swal.fire('Success', 'Selected warranty statuses updated!', 'success');
+        }
+
+        fetchWarrantyReports(); // Refresh
+        setSelectedReportIds([]);
+        setGroupUpdateStatus('');
+      } catch (error) {
+        console.error("Error in group update:", error);
+        Swal.fire('Error', `Group update failed: ${error.message}`, 'error');
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    const toggleSelectReport = (serialNumber) => {
+      setSelectedReportIds(prev =>
+        prev.includes(serialNumber) ? prev.filter(sn => sn !== serialNumber) : [...prev, serialNumber]
+      );
+    };
+
+    // Updated to filter only by serial number
+    const filteredReports = reportSearchTerm
+      ? warrantyReports.filter(report =>
         report.serial_number.toLowerCase().includes(reportSearchTerm.toLowerCase())
       )
-    : warrantyReports;
+      : warrantyReports;
 
-  // Pagination logic
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredReports.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+    // Pagination logic
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = filteredReports.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
 
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
-  const goToNextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
-  const goToPrevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+    const paginate = (pageNumber) => setCurrentPage(pageNumber);
+    const goToNextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
+    const goToPrevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
 
-  const warrantyStatusOptions = ["Pending", "Approved", "Rejected"];
+    const warrantyStatusOptions = ["Pending", "Approved", "Rejected"];
 
-  return (
-    <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
-        <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-          <input
-            type="text"
-            placeholder="Search by serial number..."
-            value={reportSearchTerm}
-            onChange={(e) => setReportSearchTerm(e.target.value)}
-            className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <p className="text-slate-600 text-sm whitespace-nowrap">
-          Showing <span className="font-semibold text-indigo-600">{filteredReports.length}</span> of <span className="font-semibold text-indigo-600">{warrantyReports.length}</span> total registrations
-        </p>
-      </div>
-      <h2 className="text-2xl font-semibold mb-2 text-slate-800">Warranty Claim Reports</h2>
-      <p className="text-sm text-slate-500 mb-6">Review and update the status of all warranty claims.</p>
-
-      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        {selectedReportIds.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <select
-              value={groupUpdateStatus}
-              onChange={(e) => setGroupUpdateStatus(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm h-full"
-            >
-              <option value="">Set Status for Selected ({selectedReportIds.length})</option>
-              {warrantyStatusOptions.map(status => <option key={status} value={status}>{status}</option>)}
-            </select>
-            <button
-              onClick={handleGroupUpdate}
-              disabled={isSubmitting || !groupUpdateStatus}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center text-sm h-full disabled:opacity-50"
-            >
-              <CheckSquare size={16} className="mr-2" /> Apply to Selected
-            </button>
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-slate-200">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
+          <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search by serial number..."
+              value={reportSearchTerm}
+              onChange={(e) => setReportSearchTerm(e.target.value)}
+              className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
           </div>
-        )}
-      </div>
-
-      {filteredReports.length === 0 ? (
-        <div className="text-center py-12">
-          <ListChecks className="mx-auto mb-6 text-slate-400" size={64} />
-          <h2 className="text-2xl font-semibold text-slate-700 mb-2">
-            {reportSearchTerm ? 'No Matching Reports' : 'No Warranty Reports Found'}
-          </h2>
-          <p className="text-slate-500 max-w-md mx-auto">
-            {reportSearchTerm ? `Your search for "${reportSearchTerm}" did not find any reports.` : 'There are currently no warranty claims to display.'}
+          <p className="text-slate-600 text-sm whitespace-nowrap">
+            Showing <span className="font-semibold text-indigo-600">{filteredReports.length}</span> of <span className="font-semibold text-indigo-600">{warrantyReports.length}</span> total registrations
           </p>
-          {reportSearchTerm && <button onClick={() => setReportSearchTerm('')} className="mt-4 px-4 py-2 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">Clear Search</button>}
         </div>
-      ) : (
-        <>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] divide-y divide-slate-200">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th scope="col" className="px-2 py-4 text-center">
-                    <input type="checkbox" className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          // Only select items on the current page
-                          const currentPageIds = currentItems.map(r => r.serial_number);
-                          setSelectedReportIds(prev => {
-                            const existingSelected = prev.filter(id => !currentPageIds.includes(id));
-                            return [...existingSelected, ...currentPageIds];
-                          });
-                        } else {
-                          // Deselect items on current page only
-                          const currentPageIds = currentItems.map(r => r.serial_number);
-                          setSelectedReportIds(prev => prev.filter(id => !currentPageIds.includes(id)));
-                        }
-                      }}
-                      checked={currentItems.length > 0 && currentItems.every(item => selectedReportIds.includes(item.serial_number))}
-                      title="Select all on this page"
-                    />
-                  </th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">User Email</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Current Status</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider min-w-[200px]">Update Status</th>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer Remarks</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
-                {currentItems.map((report) => (
-                  <tr key={report.serial_number} className={`${selectedReportIds.includes(report.serial_number) ? 'bg-indigo-50' : 'hover:bg-slate-50'} transition-colors`}>
-                    <td className="px-2 py-4 text-center">
-                      <input type="checkbox" className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
-                        checked={selectedReportIds.includes(report.serial_number)}
-                        onChange={() => toggleSelectReport(report.serial_number)}
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-slate-900">{report.serial_number}</div>
-                      <div className="text-xs text-slate-500">{report.product_name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{report.email}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                ${report.claim_status?.toLowerCase().includes('approved') ? 'bg-green-100 text-green-800' :
-                                  report.claim_status?.toLowerCase().includes('rejected') ? 'bg-red-100 text-red-800' :
-                                  report.claim_status?.toLowerCase().includes('pending') ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-slate-100 text-slate-800'}`}>
-                        {report.claim_status || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      <div className="flex items-center gap-2">
-                        <select
-                          defaultValue={report.claim_status}
-                          onChange={(e) => handleUpdateStatus(report.serial_number, e.target.value)}
-                          disabled={isSubmitting}
-                          className="block w-full pl-3 pr-8 py-2 text-sm border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                        >
-                          {warrantyStatusOptions.map(status => <option key={status} value={status}>{status}</option>)}
-                        </select>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600 max-w-xs truncate" title={report.customer_remarks}>
-                      {report.customer_remarks || 'No remarks'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <h2 className="text-2xl font-semibold mb-2 text-slate-800">Warranty Claim Reports</h2>
+        <p className="text-sm text-slate-500 mb-6">Review and update the status of all warranty claims.</p>
 
-          {/* Pagination Component */}
-          <div className="mt-6 flex items-center justify-between">
-            <div className="text-sm text-slate-600">
-              Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
-              <span className="font-medium">{Math.min(indexOfLastItem, filteredReports.length)}</span> of{" "}
-              <span className="font-medium">{filteredReports.length}</span> entries
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={goToPrevPage}
-                disabled={currentPage === 1}
-                className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          {selectedReportIds.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <select
+                value={groupUpdateStatus}
+                onChange={(e) => setGroupUpdateStatus(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm h-full"
               >
-                <ChevronLeft size={16} />
+                <option value="">Set Status for Selected ({selectedReportIds.length})</option>
+                {warrantyStatusOptions.map(status => <option key={status} value={status}>{status}</option>)}
+              </select>
+              <button
+                onClick={handleGroupUpdate}
+                disabled={isSubmitting || !groupUpdateStatus}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center text-sm h-full disabled:opacity-50"
+              >
+                <CheckSquare size={16} className="mr-2" /> Apply to Selected
               </button>
-              
-              <div className="flex items-center space-x-1">
-                {/* Show first page */}
-                {currentPage > 3 && (
-                  <>
-                    <button
-                      onClick={() => paginate(1)}
-                      className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
-                    >
-                      1
-                    </button>
-                    {currentPage > 4 && (
-                      <span className="px-1 text-slate-500">...</span>
-                    )}
-                  </>
-                )}
-                
-                {/* Show nearby pages */}
-                {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
-                  // Calculate the page number to display
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  
-                  // Only show the button if the page number is valid
-                  if (pageNum > 0 && pageNum <= totalPages) {
-                    return (
+            </div>
+          )}
+        </div>
+
+        {filteredReports.length === 0 ? (
+          <div className="text-center py-12">
+            <ListChecks className="mx-auto mb-6 text-slate-400" size={64} />
+            <h2 className="text-2xl font-semibold text-slate-700 mb-2">
+              {reportSearchTerm ? 'No Matching Reports' : 'No Warranty Reports Found'}
+            </h2>
+            <p className="text-slate-500 max-w-md mx-auto">
+              {reportSearchTerm ? `Your search for "${reportSearchTerm}" did not find any reports.` : 'There are currently no warranty claims to display.'}
+            </p>
+            {reportSearchTerm && <button onClick={() => setReportSearchTerm('')} className="mt-4 px-4 py-2 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">Clear Search</button>}
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1200px] divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th scope="col" className="px-2 py-4 text-center">
+                      <input type="checkbox" className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            // Only select items on the current page
+                            const currentPageIds = currentItems.map(r => r.serial_number);
+                            setSelectedReportIds(prev => {
+                              const existingSelected = prev.filter(id => !currentPageIds.includes(id));
+                              return [...existingSelected, ...currentPageIds];
+                            });
+                          } else {
+                            // Deselect items on current page only
+                            const currentPageIds = currentItems.map(r => r.serial_number);
+                            setSelectedReportIds(prev => prev.filter(id => !currentPageIds.includes(id)));
+                          }
+                        }}
+                        checked={currentItems.length > 0 && currentItems.every(item => selectedReportIds.includes(item.serial_number))}
+                        title="Select all on this page"
+                      />
+                    </th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">User Email</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Current Status</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider min-w-[200px]">Update Status</th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer Remarks</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-200">
+                  {currentItems.map((report) => (
+                    <tr key={report.serial_number} className={`${selectedReportIds.includes(report.serial_number) ? 'bg-indigo-50' : 'hover:bg-slate-50'} transition-colors`}>
+                      <td className="px-2 py-4 text-center">
+                        <input type="checkbox" className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
+                          checked={selectedReportIds.includes(report.serial_number)}
+                          onChange={() => toggleSelectReport(report.serial_number)}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-slate-900">{report.serial_number}</div>
+                        <div className="text-xs text-slate-500">{report.product_name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{report.email}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                ${report.claim_status?.toLowerCase().includes('approved') ? 'bg-green-100 text-green-800' :
+                            report.claim_status?.toLowerCase().includes('rejected') ? 'bg-red-100 text-red-800' :
+                              report.claim_status?.toLowerCase().includes('pending') ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-slate-100 text-slate-800'}`}>
+                          {report.claim_status || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                        <div className="flex items-center gap-2">
+                          <select
+                            defaultValue={report.claim_status}
+                            onChange={(e) => handleUpdateStatus(report.serial_number, e.target.value)}
+                            disabled={isSubmitting}
+                            className="block w-full pl-3 pr-8 py-2 text-sm border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                          >
+                            {warrantyStatusOptions.map(status => <option key={status} value={status}>{status}</option>)}
+                          </select>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600 max-w-xs truncate" title={report.customer_remarks}>
+                        {report.customer_remarks || 'No remarks'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Component */}
+            <div className="mt-6 flex items-center justify-between">
+              <div className="text-sm text-slate-600">
+                Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
+                <span className="font-medium">{Math.min(indexOfLastItem, filteredReports.length)}</span> of{" "}
+                <span className="font-medium">{filteredReports.length}</span> entries
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={goToPrevPage}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                <div className="flex items-center space-x-1">
+                  {/* Show first page */}
+                  {currentPage > 3 && (
+                    <>
                       <button
-                        key={pageNum}
-                        onClick={() => paginate(pageNum)}
-                        className={`px-3 py-1 rounded-md ${
-                          currentPage === pageNum
+                        onClick={() => paginate(1)}
+                        className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                      >
+                        1
+                      </button>
+                      {currentPage > 4 && (
+                        <span className="px-1 text-slate-500">...</span>
+                      )}
+                    </>
+                  )}
+
+                  {/* Show nearby pages */}
+                  {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                    // Calculate the page number to display
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+
+                    // Only show the button if the page number is valid
+                    if (pageNum > 0 && pageNum <= totalPages) {
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => paginate(pageNum)}
+                          className={`px-3 py-1 rounded-md ${currentPage === pageNum
                             ? "bg-indigo-600 text-white"
                             : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
-                        }`}
+                            }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    }
+                    return null;
+                  })}
+
+                  {/* Show last page */}
+                  {totalPages > 5 && currentPage < totalPages - 2 && (
+                    <>
+                      {currentPage < totalPages - 3 && (
+                        <span className="px-1 text-slate-500">...</span>
+                      )}
+                      <button
+                        onClick={() => paginate(totalPages)}
+                        className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
                       >
-                        {pageNum}
+                        {totalPages}
                       </button>
-                    );
-                  }
-                  return null;
-                })}
-                
-                {/* Show last page */}
-                {totalPages > 5 && currentPage < totalPages - 2 && (
-                  <>
-                    {currentPage < totalPages - 3 && (
-                      <span className="px-1 text-slate-500">...</span>
-                    )}
-                    <button
-                      onClick={() => paginate(totalPages)}
-                      className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
-                    >
-                      {totalPages}
-                    </button>
-                  </>
-                )}
+                    </>
+                  )}
+                </div>
+
+                <button
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight size={16} />
+                </button>
               </div>
-              
-              <button
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight size={16} />
-              </button>
             </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
+          </>
+        )}
+      </div>
+    );
+  };
   // --- ADMIN: Manage Products View Component (Placeholder) ---
   const ManageProductsView = () => {
     const [productForm, setProductForm] = useState({ product_name: '', serial_number: '' });
@@ -1383,6 +1398,9 @@ export default function ProductRegistrationsCRM() {
     const [isProcessingCsv, setIsProcessingCsv] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [activeTab, setActiveTab] = useState('single'); // 'single' or 'bulk'
+    // New state for pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10); // Adjust as needed
     const fileInputRef = useRef(null);
 
     const handleProductFormChange = (e) => {
@@ -1400,7 +1418,6 @@ export default function ProductRegistrationsCRM() {
           setError("No token found. Please log in again.");
           return;
         }
-        // ADMIN: API call to add a new product
         const response = await fetch(`https://miphi-blog-backend.vercel.app/products`, {
           method: 'POST',
           headers: {
@@ -1416,6 +1433,7 @@ export default function ProductRegistrationsCRM() {
         Swal.fire('Success', 'Product added successfully!', 'success');
         fetchAllProducts(); // Refresh the list
         setProductForm({ product_name: '', serial_number: '' }); // Reset form
+        setCurrentPage(1); // Reset to first page on new product addition
       } catch (error) {
         console.error("Error adding product:", error);
         Swal.fire('Error', `Failed to add product: ${error.message}`, 'error');
@@ -1467,7 +1485,6 @@ export default function ProductRegistrationsCRM() {
         reader.onload = async (event) => {
           const csvText = event.target.result;
 
-          // Use PapaParse to parse CSV
           Papa.parse(csvText, {
             header: true,
             skipEmptyLines: true,
@@ -1486,7 +1503,6 @@ export default function ProductRegistrationsCRM() {
                 return;
               }
 
-              // Validate required fields
               for (let i = 0; i < data.length; i++) {
                 if (!data[i].product_name || !data[i].serial_number) {
                   Swal.fire('Error', `Row ${i + 1}: Missing product_name or serial_number.`, 'error');
@@ -1495,12 +1511,10 @@ export default function ProductRegistrationsCRM() {
                 }
               }
 
-              // Process each product
               let successCount = 0;
               let failureCount = 0;
               const errorMessages = [];
 
-              // Update Swal with progress bar
               Swal.update({
                 title: 'Uploading Products',
                 html: `
@@ -1517,11 +1531,9 @@ export default function ProductRegistrationsCRM() {
                 try {
                   const product = data[i];
 
-                  // Update progress
                   const progress = Math.round(((i + 1) / data.length) * 100);
                   setUploadProgress(progress);
 
-                  // Update Swal progress bar
                   document.getElementById('progress-bar').style.width = `${progress}%`;
                   document.getElementById('progress-text').innerText = `Uploaded ${i + 1}/${data.length} products...`;
 
@@ -1550,9 +1562,9 @@ export default function ProductRegistrationsCRM() {
                 }
               }
 
-              // Show results
               fetchAllProducts(); // Refresh the product list
               resetFileInput(); // Reset the file input
+              setCurrentPage(1); // Reset to first page after CSV upload
 
               if (failureCount > 0) {
                 Swal.fire({
@@ -1608,7 +1620,6 @@ export default function ProductRegistrationsCRM() {
               setError("No token found. Please log in again.");
               return;
             }
-            // Updated to use serial number for deletion
             const response = await fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
               method: 'DELETE',
               headers: {
@@ -1622,6 +1633,7 @@ export default function ProductRegistrationsCRM() {
             }
             Swal.fire('Deleted!', 'Product has been deleted.', 'success');
             fetchAllProducts(); // Refresh list
+            setCurrentPage(1); // Reset to first page on deletion
           } catch (error) {
             console.error("Error deleting product:", error);
             Swal.fire('Error', `Failed to delete product: ${error.message}`, 'error');
@@ -1632,7 +1644,6 @@ export default function ProductRegistrationsCRM() {
       });
     };
 
-    // New function for group deletion
     const handleGroupDelete = async () => {
       if (selectedProductIds.length === 0) {
         Swal.fire('Warning', 'Please select products to delete.', 'warning');
@@ -1662,7 +1673,6 @@ export default function ProductRegistrationsCRM() {
               setError("No token found. Please log in again.");
               return;
             }
-            // Process each selected product individually
             const deletePromises = selectedProductIds.map(serialNumber =>
               fetch(`https://miphi-blog-backend.vercel.app/products/${serialNumber}`, {
                 method: 'DELETE',
@@ -1688,6 +1698,7 @@ export default function ProductRegistrationsCRM() {
 
             fetchAllProducts(); // Refresh the list
             setSelectedProductIds([]); // Clear selection
+            setCurrentPage(1); // Reset to first page on group deletion
           } catch (error) {
             console.error("Error in group deletion:", error);
             Swal.fire('Error', `Group deletion failed: ${error.message}`, 'error');
@@ -1698,21 +1709,31 @@ export default function ProductRegistrationsCRM() {
       });
     };
 
-    // Toggle product selection for group actions
     const toggleSelectProduct = (serialNumber) => {
       setSelectedProductIds(prev =>
         prev.includes(serialNumber) ? prev.filter(sn => sn !== serialNumber) : [...prev, serialNumber]
       );
     };
 
-    // Filter products by serial number
     const filteredSystemProducts = productSearchTerm
       ? allProducts.filter(product =>
         product.serial_number.toLowerCase().includes(productSearchTerm.toLowerCase())
       )
       : allProducts;
 
-    // Download sample CSV template
+    // Pagination logic
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentProducts = filteredSystemProducts.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredSystemProducts.length / itemsPerPage);
+
+    // Handle page change
+    const handlePageChange = (pageNumber) => {
+      setCurrentPage(pageNumber);
+      // Clear selection when changing pages to avoid issues with selected items not being visible
+      setSelectedProductIds([]);
+    };
+
     const downloadSampleCsv = () => {
       const csvContent = "product_name,serial_number\nProduct 1,SN001\nProduct 2,SN002\nProduct 3,SN003";
       const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -1735,7 +1756,6 @@ export default function ProductRegistrationsCRM() {
           </h2>
           <p className="text-sm text-slate-500 mb-6">Define new products that can be registered by users.</p>
 
-          {/* Tabs for single vs bulk upload */}
           <div className="mb-6 border-b border-slate-200">
             <ul className="flex flex-wrap -mb-px text-sm font-medium text-center" role="tablist">
               <li className="mr-2" role="presentation">
@@ -1763,7 +1783,6 @@ export default function ProductRegistrationsCRM() {
             </ul>
           </div>
 
-          {/* Single Product Form */}
           <div id="single-product" role="tabpanel" className={activeTab === 'single' ? '' : 'hidden'}>
             <form onSubmit={handleAddProduct} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1798,7 +1817,6 @@ export default function ProductRegistrationsCRM() {
             </form>
           </div>
 
-          {/* CSV Upload Form */}
           <div id="csv-upload" role="tabpanel" className={activeTab === 'bulk' ? '' : 'hidden'}>
             <form onSubmit={handleCsvUpload} className="space-y-4">
               <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
@@ -1884,7 +1902,7 @@ export default function ProductRegistrationsCRM() {
                 type="text"
                 placeholder="Search by serial number..."
                 value={productSearchTerm}
-                onChange={(e) => setProductSearchTerm(e.target.value)}
+                onChange={(e) => { setProductSearchTerm(e.target.value); setCurrentPage(1); }} // Reset page on search
                 className="w-full md:w-96 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -1899,10 +1917,8 @@ export default function ProductRegistrationsCRM() {
 
           <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="relative flex items-center w-full md:w-auto">
-
             </div>
 
-            {/* Show group delete button when items are selected */}
             {selectedProductIds.length > 0 && (
               <button
                 onClick={handleGroupDelete}
@@ -1919,65 +1935,112 @@ export default function ProductRegistrationsCRM() {
               {productSearchTerm ? `No products found for "${productSearchTerm}".` : "No products added to the system yet."}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] divide-y divide-slate-200">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th scope="col" className="px-2 py-3 text-center">
-                      <input
-                        type="checkbox"
-                        className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedProductIds(filteredSystemProducts.map(p => p.serial_number));
-                          } else {
-                            setSelectedProductIds([]);
-                          }
-                        }}
-                        checked={selectedProductIds.length > 0 && selectedProductIds.length === filteredSystemProducts.length}
-                        title="Select all visible"
-                      />
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Name</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered Status</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-slate-200">
-                  {filteredSystemProducts.map((product) => (
-                    <tr key={product.id || product.product_name} className={`${selectedProductIds.includes(product.serial_number) ? 'bg-indigo-50' : 'hover:bg-slate-50'} transition-colors`}>
-                      <td className="px-2 py-4 text-center">
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th scope="col" className="px-2 py-3 text-center">
                         <input
                           type="checkbox"
                           className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
-                          checked={selectedProductIds.includes(product.serial_number)}
-                          onChange={() => toggleSelectProduct(product.serial_number)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedProductIds(currentProducts.map(p => p.serial_number));
+                            } else {
+                              setSelectedProductIds([]);
+                            }
+                          }}
+                          checked={selectedProductIds.length > 0 && selectedProductIds.length === currentProducts.length}
+                          title="Select all visible"
                         />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{product.product_name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.serial_number}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.registered_status}</td>
-
-                      <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                        <button
-                          onClick={() => handleDeleteProduct(product.serial_number)}
-                          title="Delete Product"
-                          className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
-                          disabled={isSubmitting}
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Name</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered Status</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-slate-200">
+                    {currentProducts.map((product) => (
+                      <tr key={product.id || product.product_name} className={`${selectedProductIds.includes(product.serial_number) ? 'bg-indigo-50' : 'hover:bg-slate-50'} transition-colors`}>
+                        <td className="px-2 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded"
+                            checked={selectedProductIds.includes(product.serial_number)}
+                            onChange={() => toggleSelectProduct(product.serial_number)}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{product.product_name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.serial_number}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.registered_status}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                          <button
+                            onClick={() => handleDeleteProduct(product.serial_number)}
+                            title="Delete Product"
+                            className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
+                            disabled={isSubmitting}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="mt-6 flex items-center justify-between">
+                <div className="text-sm text-slate-600">
+                  Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredSystemProducts.length)} of {filteredSystemProducts.length} products
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <div className="flex space-x-1">
+                    {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        className={`px-3 py-1 border rounded-md text-sm font-medium ${currentPage === page ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
     );
+  };
+  const [tablePage, setTablePage] = useState(1); // Renamed to avoid conflict with currentPage
+  const [itemsPerPage] = useState(10);
+  // Pagination logic
+  const indexOfLastItem = tablePage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredItems.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+
+  // Handle page change
+  const handlePageChange = (pageNumber) => {
+    setTablePage(pageNumber);
   };
   // --- Main Component Render ---
   return (
@@ -1996,20 +2059,7 @@ export default function ProductRegistrationsCRM() {
             </div>
           )}
 
-          {error && (
-            <div className="max-w-4xl mx-auto">
-              <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-6 shadow-md">
-                <h3 className="text-xl font-semibold text-red-700 mb-2">Oops! Something went wrong.</h3>
-                <p className="text-red-600 mb-4">We encountered an error: {error}</p>
-                <button
-                  className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium transition-colors focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                  onClick={() => window.location.reload()}
-                > Try Again </button>
-              </div>
-            </div>
-          )}
-
-          {!loading && !error && (
+          {!loading && (
             <>
               {/* ---- USER-SPECIFIC VIEWS ---- */}
               {!isAdmin && currentPage === "registrations" && (
@@ -2020,9 +2070,14 @@ export default function ProductRegistrationsCRM() {
                       <div className="relative flex items-center w-full sm:w-auto mb-4 sm:mb-0">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
                         <input
-                          type="text" placeholder="Search by serial number..."
+                          type="text"
+                          placeholder="Search by serial number..."
                           className="w-full md:w-80 pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow text-sm"
-                          value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                          value={searchTerm}
+                          onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            setTablePage(1); // Reset to first page on search
+                          }}
                         />
                       </div>
                       <p className="text-slate-600 text-sm whitespace-nowrap">
@@ -2039,141 +2094,223 @@ export default function ProductRegistrationsCRM() {
                       <div className="text-center py-12">
                         <Package className="mx-auto mb-6 text-slate-400" size={64} />
                         <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Registrations Yet</h2>
-                        <p className="text-slate-500 max-w-md mx-auto">No product registrations found for <span className="font-medium">{userEmail}</span>.</p>
+                        <p className="text-slate-500 max-w-md mx-auto">
+                          No product registrations found for <span className="font-medium">{userEmail}</span>.
+                        </p>
                       </div>
                     ) : filteredItems.length === 0 && searchTerm ? (
                       <div className="text-center py-12">
                         <Search className="mx-auto mb-6 text-slate-400" size={64} />
                         <h2 className="text-2xl font-semibold text-slate-700 mb-2">No Matching Registrations</h2>
-                        <p className="text-slate-500 mb-6 max-w-md mx-auto">Your search for "{searchTerm}" did not match any registrations.</p>
-                        <button className="px-6 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium" onClick={() => setSearchTerm("")}> Clear Search </button>
+                        <p className="text-slate-500 mb-6 max-w-md mx-auto">
+                          Your search for "{searchTerm}" did not match any registrations.
+                        </p>
+                        <button
+                          className="px-6 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium"
+                          onClick={() => {
+                            setSearchTerm("");
+                            setTablePage(1); // Reset page when clearing search
+                          }}
+                        >
+                          Clear Search
+                        </button>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[860px] divide-y divide-slate-200">
-                          <thead className="bg-slate-50">
-                            <tr>
-                              <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Details</th>
-                              <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
-                              <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered On</th>
-                              <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Warranty Status</th>
-                              <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-slate-200">
-                            {filteredItems.map((reg, index) => {
-                              // Determine if the claim is approved
-                              const isApproved = reg.warrantyStatus?.toLowerCase().includes('approved');
-                              const isPending = reg.warrantyStatus?.toLowerCase().includes('pending');
-                              const isRejected = reg.warrantyStatus?.toLowerCase().includes('rejected');
+                      <>
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[860px] divide-y divide-slate-200">
+                            <thead className="bg-slate-50">
+                              <tr>
+                                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Details</th>
+                                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
+                                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered On</th>
+                                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Warranty Status</th>
+                                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-slate-200">
+                              {currentItems.map((reg, index) => {
+                                const isApproved = reg.warrantyStatus?.toLowerCase().includes('approved');
+                                const isPending = reg.warrantyStatus?.toLowerCase().includes('pending');
+                                const isRejected = reg.warrantyStatus?.toLowerCase().includes('rejected');
+                                const claimExists = reg.hasWarrantyRecord === true;
+                                const notYetClaimed = reg.hasWarrantyRecord === false || reg.warrantyStatus === "Not Claimed";
 
-                              // Determine if any claim exists (approved, pending, rejected)
-                              const claimExists = reg.hasWarrantyRecord === true;
-                              // Determine if the status means no claim has been made yet
-                              const notYetClaimed = reg.hasWarrantyRecord === false || reg.warrantyStatus === "Not Claimed";
+                                let claimButtonText = "Claim Warranty";
+                                let claimButtonTitle = "File a new warranty claim";
+                                let claimButtonAction = () => handleClaimClick(reg);
+                                let claimButtonDisabled = false;
+                                let claimButtonClasses = "bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500";
 
-                              let claimButtonText = "Claim Warranty";
-                              let claimButtonTitle = "File a new warranty claim";
-                              let claimButtonAction = () => handleClaimClick(reg);
-                              let claimButtonDisabled = false;
-                              let claimButtonClasses = "bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500";
-
-                              if (isApproved) {
-                                claimButtonText = "Approved";
-                                claimButtonTitle = "Warranty claim has been approved";
-                                claimButtonAction = () => { /* No action or view details */ }; // Or navigate to a read-only view if you have one
-                                claimButtonDisabled = true;
-                                claimButtonClasses = "bg-green-500 cursor-not-allowed"; // Green for approved, but disabled
-                              } else if (claimExists) { // Claim exists but is not approved (e.g., Pending, Rejected)
-                                claimButtonText = "Claimed";
-                                // handleClaimClick likely takes user to a form where they can see details
-                                claimButtonDisabled = true;
-                                if (isPending) {
-                                  claimButtonTitle = `Warranty Claim Status: Pending`;
-                                  claimButtonClasses = "bg-yellow-200 text-orange-800 border-yellow-400"; // Yellow for pending
-                                } else if (isRejected) {
-                                  // Fallback for other existing claim statuses that aren't approved, pending, or rejected
-                                  claimButtonTitle = `Warranty Claim Status: Rejected`;
-                                  claimButtonClasses = "bg-red-500 text-white-900 border-red-400";
+                                if (isApproved) {
+                                  claimButtonText = "Approved";
+                                  claimButtonTitle = "Warranty claim has been approved";
+                                  claimButtonAction = () => { };
+                                  claimButtonDisabled = true;
+                                  claimButtonClasses = "bg-green-500 cursor-not-allowed";
+                                } else if (claimExists) {
+                                  claimButtonText = "Claimed";
+                                  claimButtonDisabled = true;
+                                  if (isPending) {
+                                    claimButtonTitle = `Warranty Claim Status: Pending`;
+                                    claimButtonClasses = "bg-yellow-200 text-orange-800 border-yellow-400";
+                                  } else if (isRejected) {
+                                    claimButtonTitle = `Warranty Claim Status: Rejected`;
+                                    claimButtonClasses = "bg-red-500 text-white-900 border-red-400";
+                                  }
                                 }
-                              }
-                              // If notYetClaimed, default values for text, title, action, and enabled state are used.
 
-                              return (
-                                <tr key={index} className="hover:bg-slate-50 transition-colors group">
-                                  {/* Product Details Cell - Assumed to be similar to your existing code */}
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center">
-                                      <div className="flex-shrink-0 h-12 w-12 flex items-center justify-center bg-indigo-100 rounded-lg mr-4 group-hover:bg-indigo-200 transition-colors">
-                                        <Package className="text-indigo-600" size={24} />
+                                return (
+                                  <tr key={index} className="hover:bg-slate-50 transition-colors group">
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="flex items-center">
+                                        <div className="flex-shrink-0 h-12 w-12 flex items-center justify-center bg-indigo-100 rounded-lg mr-4 group-hover:bg-indigo-200 transition-colors">
+                                          <Package className="text-indigo-600" size={24} />
+                                        </div>
+                                        <div>
+                                          <div className="text-sm font-semibold text-slate-900">{reg.product_name || "N/A"}</div>
+                                          <div className="text-xs text-slate-500">{reg.product_category || "General"}</div>
+                                        </div>
                                       </div>
-                                      <div>
-                                        <div className="text-sm font-semibold text-slate-900">{reg.product_name || "N/A"}</div>
-                                        <div className="text-xs text-slate-500">{reg.product_category || "General"}</div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="flex items-center text-sm text-slate-700">
+                                        <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
+                                        {reg.serial_number || "N/A"}
                                       </div>
-                                    </div>
-                                  </td>
-
-                                  {/* Serial Number Cell */}
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center text-sm text-slate-700">
-                                      <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
-                                      {reg.serial_number || "N/A"}
-                                    </div>
-                                  </td>
-
-                                  {/* Registered On Cell */}
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center text-sm text-slate-700">
-                                      <Calendar className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
-                                      {formatDate(reg.registered_at)}
-                                    </div>
-                                  </td>
-
-                                  {/* Warranty Status Cell (Your existing complex badge logic) */}
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                    {(() => {
-                                      const status = reg.warrantyStatus; const hasRecord = reg.hasWarrantyRecord;
-                                      if (hasRecord === false) { return (<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-300" title="No warranty claim initiated for this product."><Info size={14} className="mr-1 text-slate-500" /> Not Claimed</span>); }
-                                      else if (hasRecord === true) {
-                                        let badgeClass = "bg-sky-100 text-sky-700 border-sky-300"; let icon = <ShieldCheck size={14} className="mr-1 text-sky-600" />; let displayStatus = typeof status === 'string' ? status : "Claimed";
-                                        if (typeof status === 'string') { const lowerStatus = status.toLowerCase(); if (lowerStatus.includes("pending")) { badgeClass = "bg-yellow-100 text-yellow-700 border-yellow-300"; icon = <Info size={14} className="mr-1 text-yellow-600" />; } else if (lowerStatus.includes("approved")) { badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-300"; icon = <ShieldCheck size={14} className="mr-1 text-emerald-600" />; } else if (lowerStatus.includes("rejected")) { badgeClass = "bg-red-100 text-red-700 border-red-300"; icon = <AlertTriangle size={14} className="mr-1 text-red-600" />; } }
-                                        return (<span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeClass}`} title={`Warranty Status: ${displayStatus}`}>{icon} {displayStatus}</span>);
-                                      } else {
-                                        let titleText = "Could not retrieve warranty status."; let displayText = "Unavailable"; if (status === "N/A (No S/N)") { titleText = "Warranty status check N/A: Serial number missing for this registration."; displayText = "N/A (No S/N)"; } else if (status === "Status Unavailable") { titleText = "Warranty status is temporarily unavailable for this product."; } else if (status === "Error Fetching Status") { titleText = "An error occurred while fetching warranty status for this product."; }
-                                        return (<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-300" title={titleText}><AlertTriangle size={14} className="mr-1 text-orange-500" /> {displayText}</span>);
-                                      }
-                                    })()}
-                                  </td>
-
-                                  {/* Actions Cell - Modified Claim Button */}
-                                  <td className="px-6 py-4 whitespace-nowrap ">
-                                    <div className="flex items-center space-x-3">
-                                      <button
-                                        onClick={() => downloadInvoice(reg.id, reg.product_name, reg.serial_number)}
-                                        disabled={!reg.invoice_receipt}
-                                        className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs"
-                                        title={!reg.invoice_receipt ? "Invoice not available" : "Download Invoice"}
-                                      >
-                                        <Download className="mr-1.5" size={14} /> Invoice
-                                      </button>
-
-                                      <button
-                                        onClick={claimButtonAction}
-                                        className={`inline-flex items-center px-3 py-1.5 border border-transparent rounded-lg shadow-sm text-white text-xs transition-colors ${claimButtonClasses} ${claimButtonDisabled ? 'disabled:opacity-70' : ''}`}
-                                        title={claimButtonTitle}
-                                        disabled={claimButtonDisabled}
-                                      >
-                                        <ShieldCheck className="mr-1.5" size={14} /> {claimButtonText}
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="flex items-center text-sm text-slate-700">
+                                        <Calendar className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
+                                        {formatDate(reg.registered_at)}
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                      {(() => {
+                                        const status = reg.warrantyStatus;
+                                        const hasRecord = reg.hasWarrantyRecord;
+                                        if (hasRecord === false) {
+                                          return (
+                                            <span
+                                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-300"
+                                              title="No warranty claim initiated for this product."
+                                            >
+                                              <Info size={14} className="mr-1 text-slate-500" /> Not Claimed
+                                            </span>
+                                          );
+                                        } else if (hasRecord === true) {
+                                          let badgeClass = "bg-sky-100 text-sky-700 border-sky-300";
+                                          let icon = <ShieldCheck size={14} className="mr-1 text-sky-600" />;
+                                          let displayStatus = typeof status === 'string' ? status : "Claimed";
+                                          if (typeof status === 'string') {
+                                            const lowerStatus = status.toLowerCase();
+                                            if (lowerStatus.includes("pending")) {
+                                              badgeClass = "bg-yellow-100 text-yellow-700 border-yellow-300";
+                                              icon = <Info size={14} className="mr-1 text-yellow-600" />;
+                                            } else if (lowerStatus.includes("approved")) {
+                                              badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-300";
+                                              icon = <ShieldCheck size={14} className="mr-1 text-emerald-600" />;
+                                            } else if (lowerStatus.includes("rejected")) {
+                                              badgeClass = "bg-red-100 text-red-700 border-red-300";
+                                              icon = <AlertTriangle size={14} className="mr-1 text-red-600" />;
+                                            }
+                                          }
+                                          return (
+                                            <span
+                                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeClass}`}
+                                              title={`Warranty Status: ${displayStatus}`}
+                                            >
+                                              {icon} {displayStatus}
+                                            </span>
+                                          );
+                                        } else {
+                                          let titleText = "Could not retrieve warranty status.";
+                                          let displayText = "Unavailable";
+                                          if (status === "N/A (No S/N)") {
+                                            titleText = "Warranty status check N/A: Serial number missing for this registration.";
+                                            displayText = "N/A (No S/N)";
+                                          } else if (status === "Status Unavailable") {
+                                            titleText = "Warranty status is temporarily unavailable for this product.";
+                                          } else if (status === "Error Fetching Status") {
+                                            titleText = "An error occurred while fetching warranty status for this product.";
+                                          }
+                                          return (
+                                            <span
+                                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-300"
+                                              title={titleText}
+                                            >
+                                              <AlertTriangle size={14} className="mr-1 text-orange-500" /> {displayText}
+                                            </span>
+                                          );
+                                        }
+                                      })()}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="flex items-center space-x-3">
+                                        <button
+                                          onClick={() => downloadInvoice(reg.id, reg.product_name, reg.serial_number)}
+                                          disabled={!reg.invoice_receipt}
+                                          className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs"
+                                          title={!reg.invoice_receipt ? "Invoice not available" : "Download Invoice"}
+                                        >
+                                          <Download className="mr-1.5" size={14} /> Invoice
+                                        </button>
+                                        <button
+                                          onClick={claimButtonAction}
+                                          className={`inline-flex items-center px-3 py-1.5 border border-transparent rounded-lg shadow-sm text-white text-xs transition-colors ${claimButtonClasses} ${claimButtonDisabled ? 'disabled:opacity-70' : ''
+                                            }`}
+                                          title={claimButtonTitle}
+                                          disabled={claimButtonDisabled}
+                                        >
+                                          <ShieldCheck className="mr-1.5" size={14} /> {claimButtonText}
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        {/* Pagination Controls */}
+                        {filteredItems.length > itemsPerPage && (
+                          <div className="mt-6 flex items-center justify-between">
+                            <div className="text-sm text-slate-600">
+                              Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredItems.length)} of {filteredItems.length} registrations
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handlePageChange(tablePage - 1)}
+                                disabled={tablePage === 1}
+                                className="px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Previous
+                              </button>
+                              <div className="flex space-x-1">
+                                {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                                  <button
+                                    key={page}
+                                    onClick={() => handlePageChange(page)}
+                                    className={`px-3 py-1 border rounded-md text-sm font-medium ${tablePage === page
+                                      ? 'bg-indigo-600 text-white border-indigo-600'
+                                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                      }`}
+                                  >
+                                    {page}
+                                  </button>
+                                ))}
+                              </div>
+                              <button
+                                onClick={() => handlePageChange(tablePage + 1)}
+                                disabled={tablePage === totalPages}
+                                className="px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </>
@@ -2184,7 +2321,6 @@ export default function ProductRegistrationsCRM() {
 
               {/* ---- ADMIN-SPECIFIC VIEWS ---- */}
               {isAdmin && currentPage === "allRegistrations" && <AllRegistrationsView />}
-              {console.log(warrantyReports)}
               {isAdmin && currentPage === "warrantyReports" && <WarrantyReportsView />}
               {isAdmin && currentPage === "manageProducts" && <ManageProductsView />}
 
@@ -2197,4 +2333,4 @@ export default function ProductRegistrationsCRM() {
       </div>
     </div>
   );
-}
+};

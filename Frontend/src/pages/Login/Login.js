@@ -1,4 +1,4 @@
-import React, { useState, useEffect ,useContext} from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 // Import your background image
@@ -185,7 +185,7 @@ const Login = () => {
         ...credentials,
         email: credentials.email.toLowerCase(),
       };
-      
+
       const response = await fetch('https://miphi-blog-backend.vercel.app/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -200,9 +200,9 @@ const Login = () => {
 
         if (data.user && typeof data.user === 'object') {
           // API returned a user object. Assume it contains email, name, mobile_number.
-         
-          userToStoreInContext = { ...data.user}; // Create a new object to avoid direct mutation if needed
-          
+
+          userToStoreInContext = { ...data.user }; // Create a new object to avoid direct mutation if needed
+
           // Ensure email from API or credentials is lowercased for consistency
           if (userToStoreInContext.email && typeof userToStoreInContext.email === 'string') {
             userToStoreInContext.email = userToStoreInContext.email.toLowerCase();
@@ -502,7 +502,7 @@ const Login = () => {
             {/* Logo */}
             <div className="bg-gray-200 shadow-lg rounded-2xl p-6 max-w-xl mx-auto mt-10 text-center">
               <h1 className="text-2xl font-semibold text-gray-800 mb-4">
-              ProductVault 
+                ProductVault
               </h1>
               <p className="text-gray-600">
                 View all the products you've registered using your email and easily claim warranty support whenever needed.
@@ -554,7 +554,7 @@ const Login = () => {
                     onChange={handleInputChange}
                     disabled={isLoading || isAnimating}
                     required
-                    
+
                     className="w-full px-4 py-3 rounded-xl text-white transition-all focus:outline-none focus:ring-2 focus:ring-white/20 placeholder-white/30"
                     style={{
                       background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.48))',
@@ -565,27 +565,27 @@ const Login = () => {
                     placeholder="Password"
                   />
                   <div
-    className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer"
-    onClick={() => setShowPassword((prev) => !prev)}
-  >
-    {showPassword ? (
-      <EyeOff className="w-5 h-5 text-white" />
-    ) : (
-      <Eye className="w-5 h-5 text-white" />
-    )}
-  </div>
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5 text-white" />
+                    ) : (
+                      <Eye className="w-5 h-5 text-white" />
+                    )}
+                  </div>
                 </div>
 
               </div>
               {/* Forgot Password Link */}
-              <div className="text-right">
+              {/* <div className="text-right">
                 <a
                   onClick={handleForgotPasswordClick}
                   className="text-white/70 hover:text-white/90 text-sm duration-300 cursor-pointer" // Added cursor-pointer
                 >
                   Forgot Password?
                 </a>
-              </div>
+              </div> */}
 
               {/* Submit button */}
               <button
