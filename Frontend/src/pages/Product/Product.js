@@ -1025,6 +1025,7 @@ export default function ProductRegistrationsCRM() {
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Mobile</th>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Details</th>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
+                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Part Number</th>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered On</th>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Invoice PDF</th>
                   </tr>
@@ -1051,6 +1052,12 @@ export default function ProductRegistrationsCRM() {
                         <div className="flex items-center text-sm text-slate-700">
                           <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
                           {reg.serial_number || "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-slate-700">
+                          <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
+                          {reg.part_number || "N/A"}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -2351,6 +2358,7 @@ export default function ProductRegistrationsCRM() {
                               <tr>
                                 <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Details</th>
                                 <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
+                                  <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Part Number</th>
                                 <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered On</th>
                                 <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Warranty Status</th>
                                 <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
@@ -2405,6 +2413,12 @@ export default function ProductRegistrationsCRM() {
                                       <div className="flex items-center text-sm text-slate-700">
                                         <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
                                         {reg.serial_number || "N/A"}
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="flex items-center text-sm text-slate-700">
+                                        <Tag className="flex-shrink-0 mr-2 text-slate-400 group-hover:text-indigo-500 transition-colors" size={18} />
+                                        {reg.part_number || "N/A"}
                                       </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
