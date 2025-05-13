@@ -386,61 +386,78 @@ export default function ProductRegistrationsCRM() {
 
   // --- User Info Card Component --- (can be used by user, or adapted for admin if needed)
   const UserInfoCard = ({ userInfoFromReg, userFromContext, userEmail }) => {
-    const displayUser = userFromContext || {
-      id: userInfoFromReg?.user_id,
-      name: userInfoFromReg?.user_name,
-      email: userEmail, // Ensure this is correctly sourced
-      mobile_number: userInfoFromReg?.mobile_number, // Corrected from mobile
-      country_code: userInfoFromReg?.country_code // Added country code
-    };
+  const displayUser = userFromContext || {
+    id: userInfoFromReg?.user_id,
+    name: userInfoFromReg?.user_name,
+    email: userEmail, // Ensure this is correctly sourced
+    mobile_number: userInfoFromReg?.mobile_number, // Corrected from mobile
+    country_code: userInfoFromReg?.country_code // Added country code
+  };
 
-    return (
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-slate-200">
-        <h2 className="text-2xl font-semibold mb-6 text-slate-800 flex items-center">
-          <User className="mr-3 text-indigo-600" size={28} />
-          Your Information
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="flex items-start p-4 bg-slate-50 rounded-lg">
-            <User className="mr-3 text-indigo-500 mt-1 flex-shrink-0" size={20} />
-            <div>
-              <p className="text-sm text-slate-500 font-medium">User ID</p>
-              <p className="font-semibold text-slate-700 text-lg">
-                {displayUser.id || 'N/A'}
-              </p>
-            </div>
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-slate-200">
+      <h2 className="text-2xl font-semibold mb-6 text-slate-800 flex items-center">
+        <User className="mr-3 text-indigo-600" size={28} />
+        Your Information
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* User ID */}
+        <div className="flex items-start p-4 bg-slate-50 rounded-lg">
+          <User className="mr-3 text-indigo-500 mt-1 flex-shrink-0" size={20} />
+          <div className="min-w-0"> {/* Added min-w-0 for better flex handling */}
+            <p className="text-sm text-slate-500 font-medium">User ID</p>
+            <p className="font-semibold text-slate-700 text-lg break-words"> {/* Added break-words */}
+              {displayUser.id || 'N/A'}
+            </p>
           </div>
-          <div className="flex items-start p-4 bg-slate-50 rounded-lg">
-            <User className="mr-3 text-indigo-500 mt-1 flex-shrink-0" size={20} />
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Name</p>
-              <p className="font-semibold text-slate-700 text-lg">
-                {displayUser.name || 'N/A'}
-              </p>
-            </div>
+        </div>
+
+        {/* Name */}
+        <div className="flex items-start p-4 bg-slate-50 rounded-lg">
+          <User className="mr-3 text-indigo-500 mt-1 flex-shrink-0" size={20} />
+          <div className="min-w-0"> {/* Added min-w-0 for better flex handling */}
+            <p className="text-sm text-slate-500 font-medium">Name</p>
+            <p className="font-semibold text-slate-700 text-lg break-words"> {/* Added break-words */}
+              {displayUser.name || 'N/A'}
+            </p>
           </div>
-          <div className="flex items-start p-4 bg-slate-50 rounded-lg">
-            <Mail className="mr-3 text-indigo-500 mt-1 flex-shrink-0" size={20} />
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Email</p>
-              <p className="font-semibold text-slate-700 text-lg">
-                {displayUser.email || 'N/A'}
-              </p>
-            </div>
+        </div>
+
+        {/* Email */}
+        <div className="flex items-start p-4 bg-slate-50 rounded-lg">
+          <Mail className="mr-3 text-indigo-500 mt-1 flex-shrink-0" size={20} />
+          {/* This div contains the "Email" label and the email value.
+              min-w-0 helps in flex contexts when a child (like the email paragraph)
+              might otherwise prevent the parent from shrinking. */}
+          <div className="min-w-0">
+            <p className="text-sm text-slate-500 font-medium">Email</p>
+            {/* break-words will allow the long email string to break and wrap to the next line.
+                It breaks between words or at any character if a single word is too long. */}
+            <p className="font-semibold text-slate-700 text-lg break-words">
+              {displayUser.email || 'N/A'}
+            </p>
           </div>
-          <div className="flex items-start p-4 bg-slate-50 rounded-lg">
-            <Phone className="mr-3 text-indigo-500 mt-1 flex-shrink-0" size={20} />
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Phone</p>
-              <p className="font-semibold text-slate-700 text-lg">
-                {displayUser.country_code || 'N/A'}-{displayUser.mobile_number || 'N/A'}
-              </p>
-            </div>
+        </div>
+
+        {/* Phone */}
+        <div className="flex items-start p-4 bg-slate-50 rounded-lg">
+          <Phone className="mr-3 text-indigo-500 mt-1 flex-shrink-0" size={20} />
+          <div className="min-w-0"> {/* Added min-w-0 for consistency and safety */}
+            <p className="text-sm text-slate-500 font-medium">Phone</p>
+            <p className="font-semibold text-slate-700 text-lg break-words"> {/* Added break-words, though less likely needed for phone */}
+              {/* Ensuring country_code and mobile_number are treated, even if one is missing */}
+              {(displayUser.country_code || displayUser.mobile_number)
+                ? `${displayUser.country_code || ''}${displayUser.country_code && displayUser.mobile_number ? '-' : ''}${displayUser.mobile_number || ''}`
+                : 'N/A'
+              }
+            </p>
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
+
 
   // --- Sidebar Component (Modified for Admin) ---
   const Sidebar = () => {
@@ -1721,7 +1738,7 @@ export default function ProductRegistrationsCRM() {
         Swal.fire('Error', `Failed to process CSV: ${error.message}`, 'error');
         setIsProcessingCsv(false);
       } finally {
-        // setIsProcessingCsv(false); // This is now handled within Papa.parse callbacks
+        setIsProcessingCsv(false); 
       }
     };
 
