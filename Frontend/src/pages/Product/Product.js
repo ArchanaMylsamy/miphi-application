@@ -431,7 +431,7 @@ export default function ProductRegistrationsCRM() {
 
     // Define action handlers for new PDF items directly within Sidebar or pass from parent
     const handleDownloadInstallationGuide = useCallback(() => {
-      const pdfUrl = '/pdf/MIPHI_Installation_Guide.pdf'; // IMPORTANT: Replace with the ACTUAL PATH to your PDF in the public folder
+      const pdfUrl = '/MiPhi_GUI_Instruction_Manual.pdf'; // IMPORTANT: Replace with the ACTUAL PATH to your PDF in the public folder
       const link = document.createElement('a');
       link.href = pdfUrl;
       link.setAttribute('download', 'MIPHI_Installation_Guide.pdf'); // Suggested filename for download
@@ -449,7 +449,7 @@ export default function ProductRegistrationsCRM() {
     }, []);
 
     const handleViewUserManual = useCallback(() => {
-      const pdfUrl = '/pdf/MIPHI_Installation_Guide.pdf'; // IMPORTANT: Replace with the ACTUAL PATH to your PDF in the public folder
+      const pdfUrl = '/Miphi_GUI_User_Manual.pdf'; // IMPORTANT: Replace with the ACTUAL PATH to your PDF in the public folder
       const link = document.createElement('a');
       link.href = pdfUrl;
       link.setAttribute('download', 'MIPHI_User_Manual.pdf'); // Suggested filename for download
@@ -1959,7 +1959,7 @@ export default function ProductRegistrationsCRM() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.serial_number}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{product.registered_status}</td>
 
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-2">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                         <button
                           onClick={() => handleDeleteProduct(product.serial_number)}
                           title="Delete Product"
@@ -2090,7 +2090,7 @@ export default function ProductRegistrationsCRM() {
                                 claimButtonDisabled = true;
                                 if (isPending) {
                                   claimButtonTitle = `Warranty Claim Status: Pending`;
-                                  claimButtonClasses = "bg-yellow-200 text-orange-900 border-yellow-400"; // Yellow for pending
+                                  claimButtonClasses = "bg-yellow-200 text-orange-800 border-yellow-400"; // Yellow for pending
                                 } else if (isRejected) {
                                   // Fallback for other existing claim statuses that aren't approved, pending, or rejected
                                   claimButtonTitle = `Warranty Claim Status: Rejected`;
