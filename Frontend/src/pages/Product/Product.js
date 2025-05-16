@@ -2157,7 +2157,7 @@ export default function ProductRegistrationsCRM() {
                 <table className="w-full min-w-[1000px] divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th scope="col" className="px-2 py-3 text-center">
+                      {/* <th scope="col" className="px-2 py-3 text-center">
                         <input type="checkbox" className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
                           onChange={(e) => {
                             if (e.target.checked) {
@@ -2169,7 +2169,7 @@ export default function ProductRegistrationsCRM() {
                           checked={currentProducts.length > 0 && selectedProductIds.length === currentProducts.length && currentProducts.every(p => selectedProductIds.includes(p.serial_number))}
                           title="Select all visible on this page"
                         />
-                      </th>
+                      </th> */}
                       <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product Name</th>
                       <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Serial Number</th>
                       <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Part Number</th>
@@ -2187,32 +2187,32 @@ export default function ProductRegistrationsCRM() {
                       <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Purchase Order Number</th>
                       <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Delivery Number</th>
                       <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Material Details</th>
-                      <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                      {/* <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th> */}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-slate-200">
                     {currentProducts.map((product) => (
                       <tr key={product.serial_number || product.id /* Fallback to id if serial_number is missing temporarily */} className={`${selectedProductIds.includes(product.serial_number) ? 'bg-indigo-50' : 'hover:bg-slate-50'} transition-colors`}>
-                        <td className="px-2 py-3 text-center">
+                        {/* <td className="px-2 py-3 text-center">
                           <input type="checkbox" className="form-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
                             checked={selectedProductIds.includes(product.serial_number)}
                             onChange={() => toggleSelectProduct(product.serial_number)}
                           />
-                        </td>
+                        </td> */}
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900">{product.product_name || 'N/A'}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.serial_number || 'N/A'}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.part_number || 'N/A'}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sales_order_number || 'N/A'}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td><td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td><td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td><td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td><td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td><td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td><td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td><td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td><td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td><td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td><td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td><td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">{product.sold_to_party || 'N/A'}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm space-x-2">
+                        {/* <td className="px-4 py-3 whitespace-nowrap text-sm space-x-2">
                           <button
                             onClick={() => handleDeleteProduct(product.serial_number)} title="Delete Product"
                             className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50" disabled={isSubmitting}
                           >
                             <Trash2 size={18} />
                           </button>
-                        </td>
+                        </td> */}
                       </tr>
                     ))}
                   </tbody>
